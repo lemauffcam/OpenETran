@@ -51,12 +51,11 @@ struct ground {
 
 	gsl_vector *voltage; /* Voltage at each node */
 	gsl_vector *current; /* Current at each node */
-	gsl_vector *hist; /* Vector of history currents at each node */
 
 	double ri;
 	double Li;
-	double Ci;
-	double Gi;
+	gsl_vector *Ci;
+	gsl_vector *Gi;
 
 	double i;   /* total ground injection current */
 	double i_bias;  /* back-injection of current to simulate reduction from R60 to Ri */
