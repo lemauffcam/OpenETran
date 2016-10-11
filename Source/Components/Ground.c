@@ -39,22 +39,39 @@ Called from the driver and xfmr modules. */
 #include "Pole.h"
 #include "Ground.h"
 
-char ground_token[] = "ground";
+/* Returns the shunt capa value in infinite medium
+	ai : soil ionized zone radius
+*/
+double shuntCapa(struct ground *ptr, double ai);
 
+/* Update currents at each node for the new time step using previously calculated voltages */
+void updateCurrent(struct ground *ptr);
+
+char ground_token[] = "ground";
 struct ground *ground_head, *ground_ptr;
 
 /* see if the ground resistance is reduced by impulse current flow */
-
 void check_ground (struct ground *ptr)
 {
-	double It, Vt, Vg, Vl, Imag;
+	double It, Vg, Vl, Imag, Vt;
+
 	
+	/* Voltage at node 1 */
 	Vt = gsl_vector_get (ptr->parent->voltage, ptr->from) - gsl_vector_get (ptr->parent->voltage, ptr->to);
+
 	It = Vt * ptr->y + ptr->i;  /* total ground current */
 	ptr->amps = It;
 	Imag = fabs (It);
-	ptr->Ri = ptr->R60 / sqrt (1.0 + Imag / ptr->Ig); /* desired impulse resistance */
-	Vg = It * ptr->Ri; /* ground voltage rise caused by Ri times It */
+
+	/* We start by solving for the voltages at each node */
+	gsl_vector_set(ptr->current, 0, It);
+	gsl_linalg_LU_solve(ptr->yTri, ptr->yPerm, ptr->current, ptr->voltage);
+
+	/* We then update the currents for the next time step */
+	updateCurrent(ptr);
+	
+	Vg = gsl_vector_get(ptr->voltage, 0); /* Updated ground voltage */
+
 /* inject this current into R60 to produce a back emf, so total ground voltage is Vg */
 	ptr->i_bias = Vg * (1.0 / ptr->Ri - ptr->y60);
 /* update past history of the built-in ground inductance */
@@ -63,6 +80,7 @@ void check_ground (struct ground *ptr)
 		ptr->h = It + Vl / ptr->zl;
 	}
 	ptr->i = ptr->h * ptr->yzl + ptr->i_bias * ptr->yr;
+
 }
 
 /* add ground bias current plus inductive past history current at the pole */
@@ -114,6 +132,8 @@ int read_ground (void)
 {
 	int i, j, k;
 	double R60, Rho, e0, L, length;
+	double radius, lengthC, depth, perm; /* Counterpoise conductor parameters */
+	int numberSegment;
 	struct ground *ptr;
 	int monitor;
 	double *target;
@@ -129,12 +149,36 @@ int read_ground (void)
 	(void) next_double (&e0);
 	(void) next_double (&L);
 	(void) next_double (&length);
+
+	(void)next_double(&radius);
+
+	/* If radius is 0, then there's no counterpoise conductor */
+	if (radius != 0.) {
+		(void) next_double (&lengthC);
+		(void) next_double (&depth);
+		(void) next_int (&numberSegment);
+		(void) next_double (&perm);
+
+		/* Must be >= 1, if there's an err the ground is considered to have no counterpoise */
+		if (numberSegment < 1) {
+			fprintf(logfp, "Err, the number of segments in the counterpoise can't be less than 1\n");
+			radius = 0;
+		}
+
+	} else {
+		lengthC = 0;
+		depth = 0;
+		numberSegment = 0;
+	}
+
 	L *= length;
 	(void) read_pairs ();
 	(void) read_poles ();
 	(void) reset_assignments ();
 	while (!next_assignment (&i, &j, &k)) {
 		ptr = add_ground (i, j, k, R60, Rho, e0, L);
+		add_counterpoise(ptr, radius, lengthC, depth, numberSegment, Rho, perm, e0);
+
 		if (monitor) {
 			target = &(ptr->amps);
 			(void) add_ammeter (i, j, IPG_FLAG, target);
@@ -186,4 +230,117 @@ double R60, double Rho, double e0, double L)
 		oe_exit (ERR_MALLOC);
 	}
 	return (NULL);
+} /* add_ground */
+
+void add_counterpoise(struct ground *ptr, double a, double length, double h, int numSeg,
+						double rho, double perm, double e0) {
+	ptr->depthC = h;
+	ptr->radiusC = a;
+	ptr->lengthC = length;
+	ptr->numSeg = numSeg;
+	ptr->rho = rho;
+	ptr->relPerm = perm;
+	ptr->e0 = e0;
+
+	double li = length / ((double)numSeg); /* Length of 1 segment of the counterpoise wire */
+	int signum;
+	double ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
+
+	/* Allocations */
+	ptr->Ybus = gsl_matrix_alloc(numSeg, numSeg);
+	ptr->yTri = gsl_matrix_alloc(numSeg, numSeg);
+	ptr->yPerm = gsl_permutation_alloc(numSeg);
+	
+	ptr->voltage = gsl_vector_calloc(numSeg);
+	ptr->current = gsl_vector_calloc(numSeg);
+	
+	ptr->hist = gsl_vector_calloc(numSeg);
+
+	/* Resistance of 1 segment of the conductor, constant in the current model */
+	ri = rho / (2 * M_PI * li) * ((2 * h + a) / li + log((li + sqrt(li * li + a * a)) / a)
+		- sqrt(1 + pow(a / li, 2)) + log((li + sqrt(li * li + 4 * h * h)) / (2 * h)) - sqrt(1 + pow(2 * h / li, 2)));
+
+	ptr->ri = ri;
+
+	/* Inductance of 1 segment of the counterpoise, constant in the current model */
+	Li = U0 * li / (2 * M_PI) * (log(2 * li / a) - 1);
+
+	ptr->Li = Li;
+
+	/* Capacitance & conductance (time dependant, initial value set for ionization radius equals conductor radius) */
+	Ci = shuntCapa(ptr, a) + shuntCapa(ptr, 2 * h - a);
+	Gi = Ci / (perm * EPS0 * rho);
+
+	ptr->Ci = Ci;
+	ptr->Gi = Gi;
+
+	/* Fill out Ybus matrix */
+	for (int i = 0; i < numSeg; i++) {
+		for (int j = 0; j < numSeg; j++) {
+			if (i == j) {
+				y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
+			
+			} else if (abs(i - j) == 1) {
+				y = -1 / (ri + 2 * Li / dT);
+			
+			} else {
+				y = 0;
+			}
+
+			gsl_matrix_set(ptr->Ybus, i, j, y);
+		}
+	}
+
+	/* First segment's admittance */
+	y = 1 / (ri + 2 * Li / dT);
+	gsl_matrix_set(ptr->Ybus, 0, 0, y);
+
+	/* Last segment's admittance */
+	y = 1 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
+	gsl_matrix_set(ptr->Ybus, numSeg - 1, numSeg - 1, y);
+
+	/* Admittance matrix triangularization (only done once in the program) */
+	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
+	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
+
+	return;
+} /* add_counterpoise */
+
+void updateCurrent(struct ground *ptr) {
+	double ri = ptr->ri, Li = ptr->Li, Ci = ptr->Ci, Gi = ptr->Gi, i;
+	int k;
+
+	/* We don't care about the current in the first segment since it's injected via the base of the tower */
+	for (k = 1; k < ptr->numSeg-1; k++) {
+		i = -(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k - 1)) / (ri + 2 * Li / dT) +
+			(2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k) +
+			(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k + 1)) / (ri + 2 * Li / dT);
+
+		i -= gsl_vector_get(ptr->current, k) - Gi * gsl_vector_get(ptr->voltage, k); // History current
+
+		gsl_vector_set(ptr->current, k, i);
+	}
+
+	/* Last node */
+	i = -(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k - 1)) / (ri + 2 * Li / dT) +
+		(2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
+	
+	i -= gsl_vector_get(ptr->current, k) - Gi * gsl_vector_get(ptr->voltage, k); // History current
+	
+	gsl_vector_set(ptr->current, k, i);
+
+	return;
+}
+
+/* Returns value of shunt capacitance in an infinite medium.
+	- ai : soil ionization radius
+*/
+double shuntCapa(struct ground *ptr, double ai) {
+	double perm = ptr->relPerm * EPS0; /* Soil permittivity */
+	double li = ptr->lengthC / ptr->numSeg;
+
+	double Ci = (2 * M_PI * perm / ( ai / li + log( (li + sqrt(pow(li, 2) + pow(ai, 2))) / ai )
+		- sqrt(1 + pow(ai / li, 2)) ));
+
+	return Ci;
 }

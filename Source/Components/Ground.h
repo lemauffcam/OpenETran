@@ -23,6 +23,10 @@
 
 extern char ground_token[];
 
+#define U0		1.256637061e-6 /* Free space magnetic permeability */
+#define EPS0	8.8419412828e-12 /* Free space electric permittivity */
+#define Y_OPEN  1.0e-9      /* admittance for an "open circuit" */
+
 struct ground {
 	double R60; /* power frequency resistance */
 	double y60; /* admittance for R60 */
@@ -30,6 +34,30 @@ struct ground {
 	double Ig;  /* soil ionization current */
 	double y;   /* admittance for the pole y matrix */
 	double h;   /* past history current for built-in inductance */
+
+	double depthC; /* Depth in m. of counterpoise conductor */
+	double radiusC; /* Radius in m. of counterpoise conductor */
+	double lengthC; /* Total length in m. of counterpoise conductor */
+	double li; /* Length of 1 segment of counterpoise conductor */
+	int numSeg; /* Number of segments (RLC & G cells) in the counterpoise conductor */
+	double rho; /* Resistivity of soil */
+	double relPerm; /* Relative electrical permittivity of soil */
+	double e0; /* Critical field gradient (electric field intensity on the boundary of the soil ionized zone) */
+
+	gsl_matrix *Ybus; /* Nodal admittance matrix */
+	gsl_matrix *yTri; /* Triangularized Ybus */
+
+	gsl_permutation *yPerm; /* Permutation matrix for LU decomposition */
+
+	gsl_vector *voltage; /* Voltage at each node */
+	gsl_vector *current; /* Current at each node */
+	gsl_vector *hist; /* Vector of history currents at each node */
+
+	double ri;
+	double Li;
+	double Ci;
+	double Gi;
+
 	double i;   /* total ground injection current */
 	double i_bias;  /* back-injection of current to simulate reduction from R60 to Ri */
 	double amps; /* total current in the ground */
@@ -52,6 +80,16 @@ void reset_ground (struct ground *ptr);
 int read_ground (void);
 struct ground *add_ground (int i, int j, int k, double R60, 
 	double Rho, double e0, double L);
+
+/* Adds counterpoise wire properties to the ground structure.
+	Rho : soil resistivity
+	Perm : soil relative permittivity
+	e0 : Critical electrical gradient (at limit of ionized zone)
+	numSeg : Number of segments in counterpoise conductor (see physical model)
+*/
+void add_counterpoise(struct ground *ptr, double radius, double length, double depth, int numSeg,
+						double rho, double perm, double e0);
+
 struct ground *find_ground (int at, int from, int to);
 
 #endif
