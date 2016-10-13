@@ -1,0 +1,25 @@
+4 5 30 1 1 0.02e-6 25e-6
+conductor 1 10 -1.5 0.0715 3854 
+conductor 2 10.5 0 0.0715 11097 
+conductor 3 10 1.5 0.0715 7243
+conductor 4 8 0 0.0715 0
+
+surge 54000 0.00000383 0.000103638 
+pairs 1 0
+poles 3
+
+insulator 300000 0 5.42434 8.4265E+21
+pairs 1 4 2 4 3 4
+poles 3
+
+arrester -40.0e3 40.0e3 0.5 1.0e-6 0.0
+pairs 1 4 2 4 3 4
+poles 2
+
+ground -85 250 400000 0.0000005 10 0.1 50 0.8 5 300
+pairs 4 0
+poles 3
+
+meter
+pairs 1 4 2 4 3 4 4 0
+poles 2 3 5

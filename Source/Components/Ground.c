@@ -152,7 +152,7 @@ int read_ground (void)
 	(void)next_double(&radius);
 
 	/* If radius is 0, then there's no counterpoise conductor */
-	if (radius != 0.) {
+	if (radius > 0.0) {
 		(void) next_double (&lengthC);
 		(void) next_double (&depth);
 		(void) next_int (&numberSegment);
@@ -233,14 +233,19 @@ double R60, double Rho, double e0, double L)
 
 void add_counterpoise(struct ground *ptr, double a, double length, double h, int numSeg,
 						double rho, double perm, double e0) {
-	double li = length / ((double)numSeg); /* Length of 1 segment of the counterpoise wire */
+
+	double li; /* Length of 1 segment of the counterpoise wire */
 	int signum;
 	double ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
 
+	
+	ptr->numSeg = numSeg;
+	if (numSeg == 0) return;
+
+	li = length / ((double)numSeg);
 	ptr->depthC = h;
 	ptr->radiusC = a;
 	ptr->lengthC = length;
-	ptr->numSeg = numSeg;
 	ptr->rho = rho;
 	ptr->relPerm = perm;
 	ptr->e0 = e0;
@@ -309,10 +314,14 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	return;
 } /* add_counterpoise */
 
+static FILE *fp = NULL;  /* assumes just one active counterpoise in the model */
+
 void updateModel(struct ground *ptr) {
 	double ri = ptr->ri, Li = ptr->Li, li = ptr->li, perm = ptr->relPerm * EPS0;
 	double Ci, Gi, i, dI, ai, y;
 	int k, signum;
+
+	if (ptr->numSeg < 1) return; /* there is no counterpoise here */
 
 	/* We don't care about the current in the first segment since it's injected via the base of the tower */
 	for (k = 1; k < ptr->numSeg - 1; k++) {
@@ -340,7 +349,6 @@ void updateModel(struct ground *ptr) {
 
 		gsl_vector_set(ptr->Ci, k, Ci);
 		gsl_vector_set(ptr->Gi, k, Gi);
-
 	}
 
 	/* Last node */
@@ -370,6 +378,29 @@ void updateModel(struct ground *ptr) {
 	/* Triangularization of Ybus */
 	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
 	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
+
+	/* temporary output logging */
+	if (NULL == fp)	{
+		fp = fopen ("cpground.csv", "w"); /* let fp close when the program exits */
+		fprintf(fp, "t,");
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "I%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "V%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "R%d,", k); /* don't these ever change? */
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "L%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "C%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "G%d,", k);
+		fprintf(fp,"\n");
+	}
+	if (NULL != fp)	{
+		fprintf(fp, "%G,", t);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->current, k));
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->voltage, k));
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", ptr->ri);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", ptr->Li);
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->Ci, k));
+		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->Gi, k));
+		fprintf(fp,"\n");
+	}
 
 	return;
 }
