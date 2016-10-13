@@ -340,7 +340,7 @@ void updateModel(struct ground *ptr) {
 		dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 		ai = ptr->radiusC + dI * ptr->rho / (2 * M_PI * ptr->e0 * li);
 
-		Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
+		Ci = shuntCapa(ptr, ai)+ shuntCapa(ptr, fmax(ptr->radiusC, (2 * ptr->depthC - ai))); 
 
 		Gi = Ci / (perm * ptr->rho);
 
@@ -408,12 +408,15 @@ void updateModel(struct ground *ptr) {
 /* Returns value of shunt capacitance in an infinite medium.
 	- ai : soil ionization radius
 */
+
+#define MIN_AI 1.0e-6
+
 double shuntCapa(struct ground *ptr, double ai) {
 	double perm = ptr->relPerm * EPS0; /* Soil permittivity */
 	double li = ptr->li;
 
-	if (ai < 0.) {
-		ai *= -1.;
+	if (ai < MIN_AI) {
+		ai = MIN_AI;
 	}
 
 	double C = 2 * M_PI * perm  * li / ( ai / li + log( (li + sqrt(pow(li, 2) + pow(ai, 2))) / ai )
