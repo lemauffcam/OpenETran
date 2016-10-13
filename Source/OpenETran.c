@@ -30,6 +30,10 @@
 #define strnicmp strncasecmp
 #endif
 
+#ifdef __APPLE__
+#define strnicmp strncasecmp
+#endif
+
 #define STREAM_LEN 4096
 #define INPUT_EXT      ".dat"
 #define OUTPUT_EXT     ".out"
