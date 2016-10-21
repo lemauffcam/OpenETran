@@ -101,7 +101,7 @@ struct customer *find_customer (int at, int from, int to)
 	customer_ptr = customer_head;
 	while (((customer_ptr = customer_ptr->next) != NULL)) {
 		if ((customer_ptr->parent->location == at) &&
-			(customer_ptr->from == from) &&(customer_ptr->from == from)) return customer_ptr;
+			(customer_ptr->from == from) &&(customer_ptr->to == to)) return customer_ptr;
 	}
 	return NULL;
 }

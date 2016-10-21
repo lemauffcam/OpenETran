@@ -239,13 +239,15 @@ double R60, double Rho, double e0, double L)
 void add_counterpoise(struct ground *ptr, double a, double length, double h, int numSeg,
 						double rho, double perm, double e0) {
 
-	double li; /* Length of 1 segment of the counterpoise wire */
+	double li, ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
 	int signum;
-	double ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
-
 	
 	ptr->numSeg = numSeg;
-	if (numSeg == 0) return;
+
+	/* No counterpoise here */
+	if (!numSeg) {
+		return;
+	}
 
 	li = length / ((double)numSeg);
 	ptr->depthC = h;
@@ -266,6 +268,8 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 
 	ptr->Ci = gsl_vector_alloc(numSeg);
 	ptr->Gi = gsl_vector_alloc(numSeg);
+
+	ptr->hist = gsl_vector_calloc(numSeg);
 
 	/* Resistance of 1 segment of the conductor, constant in the current model */
 	ri = rho / (2 * M_PI * li) * ((2 * h + a) / li + log((li + sqrt(li * li + a * a)) / a)
@@ -324,7 +328,10 @@ void updateModel(struct ground *ptr) {
 	double Ci, Gi, i, dI, ai, y;
 	int k, signum;
 
-	if (ptr->numSeg < 1) return; /* there is no counterpoise here */
+	/* There is no counterpoise here */
+	if (!ptr->numSeg) {
+		return;
+	}
 
 	/* We don't care about the current in the first segment since it's injected via the base of the tower */
 	for (k = 1; k < ptr->numSeg - 1; k++) {
@@ -336,19 +343,26 @@ void updateModel(struct ground *ptr) {
 			(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k + 1)) / (ri + 2 * Li / dT);
 
 		/* History current */
-		i -= gsl_vector_get(ptr->current, k) - Gi * gsl_vector_get(ptr->voltage, k);
+		i -= gsl_vector_get(ptr->hist, k);
 
 		gsl_vector_set(ptr->current, k, i);
 
-		/* Update the Ybus matrix */
+		/* Update history current for next time step */
+		gsl_vector_set(ptr->hist, k, i - (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k));
+
+		/* Calculate new values of Ci & Gi using the leaked current */
 		dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 		ai = ptr->radiusC + dI * ptr->rho / (2 * M_PI * ptr->e0 * li);
 
-		Ci = shuntCapa(ptr, ai)+ shuntCapa(ptr, fmax(ptr->radiusC, (2 * ptr->depthC - ai))); 
-
+		Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
 		Gi = Ci / (perm * ptr->rho);
 
-		y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT; /* New admittance value */
+		/* Update history current again with the new value of Ci (conservation of charge) */
+		i = gsl_vector_get(ptr->hist, k);
+		gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
+
+		/* New admittance value for the Ybus matrix*/
+		y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
 		gsl_matrix_set(ptr->Ybus, k, k, y);
 
 		gsl_vector_set(ptr->Ci, k, Ci);
@@ -362,18 +376,27 @@ void updateModel(struct ground *ptr) {
 	i = -(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k - 1)) / (ri + 2 * Li / dT) +
 		(2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 	
-	i -= gsl_vector_get(ptr->current, k) - Gi * gsl_vector_get(ptr->voltage, k); // History current
-	
+	/* History current */
+	i -= gsl_vector_get(ptr->hist, k);
+
 	gsl_vector_set(ptr->current, k, i);
 
-	/* Update the Ybus matrix */
+	/* Update history current for next time step (will be changed again when Ci is updated) */
+	gsl_vector_set(ptr->hist, k, i - (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k));
+
+	/* Calculate new values of Ci & Gi using the leaked current */
 	dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 	ai = ptr->radiusC + dI * ptr->rho / (2 * M_PI * ptr->e0 * li);
 
 	Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
-	Gi = Ci / (ptr->relPerm * EPS0 * ptr->rho);
+	Gi = Ci / (perm * ptr->rho);
 
-	y = 1 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT; /* New admittance value */
+	/* Update history current again with the new value of Ci (conservation of charge) */
+	i = gsl_vector_get(ptr->hist, k);
+	gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
+
+	/* New admittance value for the Ybus matrix */
+	y = 1 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
 	gsl_matrix_set(ptr->Ybus, k, k, y);
 
 	gsl_vector_set(ptr->Ci, k, Ci);
@@ -383,6 +406,7 @@ void updateModel(struct ground *ptr) {
 	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
 	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
 
+#if 0
 	/* temporary output logging */
 	if (NULL == fp)	{
 		fp = fopen("cpground.csv", "w"); /* let fp close when the program exits */
@@ -405,6 +429,7 @@ void updateModel(struct ground *ptr) {
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Gi, k));
 		fprintf(fp, "\n");
 	}
+#endif // 0
 
 	return;
 } /* updateModel */

@@ -46,7 +46,6 @@ struct ground {
 
 	gsl_matrix *Ybus; /* Nodal admittance matrix */
 	gsl_matrix *yTri; /* Triangularized Ybus */
-
 	gsl_permutation *yPerm; /* Permutation matrix for LU decomposition */
 
 	gsl_vector *voltage; /* Voltage at each node */
@@ -56,6 +55,8 @@ struct ground {
 	double Li;
 	gsl_vector *Ci;
 	gsl_vector *Gi;
+
+	gsl_vector *hist; /* History current */
 
 	double i;   /* total ground injection current */
 	double i_bias;  /* back-injection of current to simulate reduction from R60 to Ri */
