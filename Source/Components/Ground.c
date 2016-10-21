@@ -51,6 +51,7 @@ void updateModel(struct ground *ptr);
 
 char ground_token[] = "ground";
 struct ground *ground_head, *ground_ptr;
+static FILE *fp = NULL;  /* assumes just one active counterpoise in the model */
 
 /* see if the ground resistance is reduced by impulse current flow */
 void check_ground (struct ground *ptr) {
@@ -81,7 +82,8 @@ void check_ground (struct ground *ptr) {
 	}
 	ptr->i = ptr->h * ptr->yzl + ptr->i_bias * ptr->yr;
 
-}
+	return;
+} /* check_ground */
 
 /* add ground bias current plus inductive past history current at the pole */
 
@@ -162,6 +164,9 @@ int read_ground (void)
 		if (numberSegment < 1) {
 			fprintf(logfp, "Err, the number of segments in the counterpoise can't be less than 1\n");
 			radius = 0;
+			lengthC = 0;
+			depth = 0;
+			numberSegment = 0;
 		}
 
 	} else {
@@ -184,7 +189,7 @@ int read_ground (void)
 		}
 	}
 	return (0);
-}
+} /* read_ground */
 
 /* reset the ground history parameters */
 
@@ -314,8 +319,6 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	return;
 } /* add_counterpoise */
 
-static FILE *fp = NULL;  /* assumes just one active counterpoise in the model */
-
 void updateModel(struct ground *ptr) {
 	double ri = ptr->ri, Li = ptr->Li, li = ptr->li, perm = ptr->relPerm * EPS0;
 	double Ci, Gi, i, dI, ai, y;
@@ -332,7 +335,8 @@ void updateModel(struct ground *ptr) {
 			(2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k) +
 			(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k + 1)) / (ri + 2 * Li / dT);
 
-		i -= gsl_vector_get(ptr->current, k) - Gi * gsl_vector_get(ptr->voltage, k); // History current
+		/* History current */
+		i -= gsl_vector_get(ptr->current, k) - Gi * gsl_vector_get(ptr->voltage, k);
 
 		gsl_vector_set(ptr->current, k, i);
 
@@ -381,42 +385,39 @@ void updateModel(struct ground *ptr) {
 
 	/* temporary output logging */
 	if (NULL == fp)	{
-		fp = fopen ("cpground.csv", "w"); /* let fp close when the program exits */
+		fp = fopen("cpground.csv", "w"); /* let fp close when the program exits */
 		fprintf(fp, "t,");
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "I%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "V%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "R%d,", k); /* don't these ever change? */
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "L%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "C%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "G%d,", k);
-		fprintf(fp,"\n");
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "I%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "V%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "R%d,", k); /* don't these ever change? */
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "L%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "C%d,", k);
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "G%d,", k);
+		fprintf(fp, "\n");
 	}
 	if (NULL != fp)	{
 		fprintf(fp, "%G,", t);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->current, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->voltage, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", ptr->ri);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", ptr->Li);
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->Ci, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf (fp, "%G,", gsl_vector_get (ptr->Gi, k));
-		fprintf(fp,"\n");
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->current, k));
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->voltage, k));
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", ptr->ri);
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", ptr->Li);
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Ci, k));
+		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Gi, k));
+		fprintf(fp, "\n");
 	}
 
 	return;
-}
+} /* updateModel */
 
 /* Returns value of shunt capacitance in an infinite medium.
 	- ai : soil ionization radius
 */
-
-#define MIN_AI 1.0e-6
-
 double shuntCapa(struct ground *ptr, double ai) {
 	double perm = ptr->relPerm * EPS0; /* Soil permittivity */
 	double li = ptr->li;
 
-	if (ai < MIN_AI) {
-		ai = MIN_AI;
+	if (ai < ptr->radiusC) {
+		ai = ptr->radiusC;
 	}
 
 	double C = 2 * M_PI * perm  * li / ( ai / li + log( (li + sqrt(pow(li, 2) + pow(ai, 2))) / ai )
