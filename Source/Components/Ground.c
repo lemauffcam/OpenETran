@@ -57,10 +57,11 @@ static FILE *fp = NULL;  /* assumes just one active counterpoise in the model */
 void check_ground (struct ground *ptr) {
 	double It, Vg, Vl, Imag, Vt;
 	
-	/* Voltage at node 1 */
+	/* Voltage at node 0 */
 	Vt = gsl_vector_get (ptr->parent->voltage, ptr->from) - gsl_vector_get (ptr->parent->voltage, ptr->to);
 
-	It = Vt * ptr->y + ptr->i;  /* total ground current */
+	/* Total ground current */
+	It = Vt * ptr->y + ptr->i;
 	ptr->amps = It;
 	Imag = fabs (It);
 
@@ -71,15 +72,21 @@ void check_ground (struct ground *ptr) {
 	/* We then update the currents and the Ybus matrix for the next time step */
 	updateModel(ptr);
 	
-	Vg = gsl_vector_get(ptr->voltage, 0); /* Updated ground voltage */
+	/* Updated ground voltage */
+	Vg = gsl_vector_get(ptr->voltage, 0);
 
-/* inject this current into R60 to produce a back emf, so total ground voltage is Vg */
-	ptr->i_bias = Vg * (1.0 / ptr->Ri - ptr->y60);
-/* update past history of the built-in ground inductance */
+	/* Current ground impulse resistance */
+	ptr->Ri = Vg / It;
+
+	/* Bias current to add at node 0 so that Vg equals Vt */
+	ptr->i_bias = (Vt - Vg) / ptr->Ri;
+
+	/* update past history of the built-in ground inductance */
 	Vl = Vt - Vg;
 	if (ptr->zl > 0.0) {
 		ptr->h = It + Vl / ptr->zl;
 	}
+
 	ptr->i = ptr->h * ptr->yzl + ptr->i_bias * ptr->yr;
 
 	return;
@@ -347,8 +354,8 @@ void updateModel(struct ground *ptr) {
 
 		gsl_vector_set(ptr->current, k, i);
 
-		/* Update history current for next time step */
-		gsl_vector_set(ptr->hist, k, i - (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k));
+		/* Update history current for next time step (will be changed again when Ci is updated) */
+		i -= (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 
 		/* Calculate new values of Ci & Gi using the leaked current */
 		dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
@@ -358,7 +365,6 @@ void updateModel(struct ground *ptr) {
 		Gi = Ci / (perm * ptr->rho);
 
 		/* Update history current again with the new value of Ci (conservation of charge) */
-		i = gsl_vector_get(ptr->hist, k);
 		gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
 
 		/* New admittance value for the Ybus matrix*/
@@ -382,7 +388,7 @@ void updateModel(struct ground *ptr) {
 	gsl_vector_set(ptr->current, k, i);
 
 	/* Update history current for next time step (will be changed again when Ci is updated) */
-	gsl_vector_set(ptr->hist, k, i - (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k));
+	i -= (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 
 	/* Calculate new values of Ci & Gi using the leaked current */
 	dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
@@ -392,7 +398,6 @@ void updateModel(struct ground *ptr) {
 	Gi = Ci / (perm * ptr->rho);
 
 	/* Update history current again with the new value of Ci (conservation of charge) */
-	i = gsl_vector_get(ptr->hist, k);
 	gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
 
 	/* New admittance value for the Ybus matrix */
@@ -406,15 +411,12 @@ void updateModel(struct ground *ptr) {
 	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
 	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
 
-#if 0
 	/* temporary output logging */
 	if (NULL == fp)	{
 		fp = fopen("cpground.csv", "w"); /* let fp close when the program exits */
 		fprintf(fp, "t,");
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "I%d,", k);
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "V%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "R%d,", k); /* don't these ever change? */
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "L%d,", k);
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "C%d,", k);
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "G%d,", k);
 		fprintf(fp, "\n");
@@ -423,13 +425,10 @@ void updateModel(struct ground *ptr) {
 		fprintf(fp, "%G,", t);
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->current, k));
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->voltage, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", ptr->ri);
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", ptr->Li);
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Ci, k));
 		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Gi, k));
 		fprintf(fp, "\n");
 	}
-#endif // 0
 
 	return;
 } /* updateModel */
