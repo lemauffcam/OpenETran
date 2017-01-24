@@ -12,11 +12,24 @@ def writeKey(f, openetran, key):
     err = 0
 
     for v in openetran[key]:
-        # We first check if evey field has been written in.
-        for i in range(len(v)):
-            if v[i] == '':
+        # We first check if evey field has been written in (counterpoise fields
+        # in "ground" are optionnal)
+        if key == 'ground':
+            for i in range(5):
+                if v[i] == '':
+                    err = 1
+                    break
+
+            i = len(v)
+            if v[i-1] == '' or v[i-2] == '':
                 err = 1
                 break
+
+        else:
+            for i in range(len(v)):
+                if v[i] == '':
+                    err = 1
+                    break
 
         # If there's an error (missing text field), we go to the next list
         if err == 1:

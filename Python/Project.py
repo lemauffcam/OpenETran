@@ -66,6 +66,9 @@ def simulateProject(plotMode, self, openetran):
             print(completedProcess.stderr)
             return
 
+        elif completedProcess.returncode != 0:
+            print('Error in OpenEtran')
+
         else:
             # Interpreting the output .csv file
             outputFileName = openetran['name'] + '.csv'
@@ -82,5 +85,9 @@ def simulateProject(plotMode, self, openetran):
 
         completedProcess = subprocess.run(["openetran.exe", "-icrit", pole1, pole2, wire, inputFileName],
                                       stderr=subprocess.PIPE, stdout = subprocess.PIPE, universal_newlines=True)
+
+        if completedProcess.returncode != 0:
+            print('Error in OpenEtran')
+            return
 
         print(completedProcess.stdout)
