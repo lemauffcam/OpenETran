@@ -44,7 +44,7 @@ class GUi_Tab(object):
     def setupUi(self, Tab):
         Tab.setWindowTitle('OpenETran')
 
-        # Project Tab with Save and Load buttons and Project Name text field
+        # Project Tab
         self.Project = QWidget()
         hbox = QHBoxLayout()
 
@@ -66,7 +66,7 @@ class GUi_Tab(object):
         self.Project.setLayout(hbox)
         Tab.addTab(self.Project, 'Project')
 
-        # Simulation Tab with sim parameters and simulation button
+        # Simulation Tab
         self.Simulation = QWidget()
         grid = QGridLayout()
         self.Simulation.setLayout(grid)
@@ -79,6 +79,17 @@ class GUi_Tab(object):
 
         simulate = QPushButton('Simulate !')
         grid.addWidget(simulate, 0,  3)
+
+        plotMode = QRadioButton('One shot mode simulation')
+        plotMode.setChecked(True)
+        grid.addWidget(plotMode, 1, 3)
+
+        critMode = QRadioButton('Critical current iteration simulation')
+        grid.addWidget(critMode, 2, 3)
+
+        pole1 = QLineEdit('First pole to hit')
+        pole2 = QLineEdit('Last pole to hit')
+        wire = QLineEdit('Wire')
 
         Tab.addTab(self.Simulation, 'Simulation')
 
@@ -246,10 +257,33 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', '/', '/',
                  'Meter', '/', '/', '/',
-                 'Type', '', 'Pairs', '',
+                 'Type', '//', 'Pairs', '',
                  'Poles', '', '/', '/']
 
-        addWidgets(grid, names, 4, 4)
+        positions = [(i,j) for i in range(4) for j in range(4)]
+        for position, name in zip(positions, names):
+            if name == '':
+                widget = QLineEdit()
+
+            elif name == 'New' or name == 'Delete':
+                widget = QPushButton(name)
+
+            elif name == '/':
+                widget = QLabel()
+
+            elif name == '//':
+                widget = QComboBox()
+                widget.addItem('Voltage')
+                widget.addItem('Arrester/Arrbez current')
+                widget.addItem('Ground current')
+                widget.addItem('Customer house current')
+                widget.addItem('Transformer X2 term. current')
+                widget.addItem('Pipegap current')
+
+            else:
+                widget = QLabel(name)
+
+            grid.addWidget(widget, *position)
 
         Tab.addTab(self.Meter, 'Meter')
 
@@ -260,9 +294,10 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', '/', '/',
                  'Resistor', '/', '/', '/',
-                 'Value (Ohm)', '', '/', '/']
+                 'Value (Ohm)', '', 'Pairs', '',
+                 'Poles', '', '/', '/']
 
-        addWidgets(grid, names, 3, 4)
+        addWidgets(grid, names, 4, 4)
 
         # Tab.addTab(self.Resistor, 'Resistor')
 
@@ -273,9 +308,10 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', '/', '/',
                  'Capacitor', '/', '/', '/',
-                 'Value (F)', '', '/', '/']
+                 'Value (F)', '', 'Pairs', '',
+                 'Poles', '', '/', '/']
 
-        addWidgets(grid, names, 3, 4)
+        addWidgets(grid, names, 4, 4)
 
         # Tab.addTab(self.Capacitor, 'Capacitor')
 
@@ -286,9 +322,10 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', '/', '/',
                  'Inductor', '/', '/', '/',
-                 'Series resistance (Ohm)', '', 'Value (H)', '']
+                 'Series resistance (Ohm)', '', 'Value (H)', '',
+                 'Pairs', '', 'Poles', '']
 
-        addWidgets(grid, names, 3, 4)
+        addWidgets(grid, names, 4, 4)
 
         # Tab.addTab(self.Inductor, 'Inductor')
 
@@ -303,9 +340,10 @@ class GUi_Tab(object):
                  'Lhg (H/m)', '', 'Ground lead length (m)', '', 'Transf. turns ratio', '',
                  'Lp (H)', '', 'Ls1 (H)', '', 'Ls2 (H)', '',
                  'Lcm (H/m)', '', 'rA (m)', '', 'rN (m)', '',
-                 'Dan (m)', '', 'Daa (m)', '', 'Service drop length (m)', '']
+                 'Dan (m)', '', 'Daa (m)', '', 'Service drop length (m)', '',
+                 'Pairs', '', 'Poles', '', '/', '/']
 
-        addWidgets(grid, names, 7, 6)
+        addWidgets(grid, names, 8, 6)
 
         # Tab.addTab(self.Customer, 'Customer')
 
@@ -316,9 +354,10 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', '/', '/',
                  'Pipegap', '/', '/', '/',
-                 'CFO between conductors (V)', '', 'Series resistance (Ohm)', '']
+                 'CFO between conductors (V)', '', 'Series resistance (Ohm)', '',
+                 'Pairs', '', 'Poles', '']
 
-        addWidgets(grid, names, 3, 4)
+        addWidgets(grid, names, 4, 4)
 
         # Tab.addTab(self.Pipegap, 'Pipegap')
 
@@ -347,9 +386,24 @@ class GUi_Tab(object):
                 Tab.removeTab( Tab.indexOf(self.Pipegap) )
 
         @pyqtSlot()
+        def simOneShot():
+            if plotMode.isChecked() == True:
+                pole1.setParent(None)
+                pole2.setParent(None)
+                wire.setParent(None)
+
+        @pyqtSlot()
+        def simCrit():
+            if critMode.isChecked() == True:
+                grid = self.Simulation.layout()
+                grid.addWidget(pole1, 3, 3)
+                grid.addWidget(pole2, 4, 3)
+                grid.addWidget(wire, 5, 3)
+
+        @pyqtSlot()
         def simulateProject():
             openetran = saveProject()
-            Project.simulateProject(openetran)
+            Project.simulateProject(plotMode, self, openetran)
 
         @pyqtSlot()
         def saveProject():
@@ -530,6 +584,9 @@ class GUi_Tab(object):
         # RadioButtons
         guiSimple.toggled.connect(dispSimple)
         guiNormal.toggled.connect(dispNormal)
+
+        plotMode.toggled.connect(simOneShot)
+        critMode.toggled.connect(simCrit)
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)

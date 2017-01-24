@@ -91,7 +91,31 @@ def write(openetran):
                 f.write('pairs ' + v[i] + '\n')
                 f.write('poles ' + v[i+1] + '\n')
 
-                f.write('\n\n')
+                f.write('\n')
+
+            elif k == 'label':
+                err = 0
+
+                for v in openetran['label']:
+                    # We first check if evey field has been written in.
+                    for i in range(len(v)):
+                        if v[i] == '':
+                            err = 1
+                            break
+
+                    # If there's an error (missing text field), we go to the next list
+                    if err == 1:
+                        # print('Error, missing field in ' + k)
+                        continue
+
+                    if v[0] == 'Phase':
+                        f.write('labelphase ')
+                    else:
+                        f.write('labelpole ')
+
+                    f.write(v[1] + ' ' + v[2] + '\n')
+
+                f.write('\n')
 
             else:
                 writeKey(f, openetran, k)

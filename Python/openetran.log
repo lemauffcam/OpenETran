@@ -1,1 +1,9 @@
-bad number of poles: 0
+lt in location control mode
+has_arresters = 0
+
+
+case 1, pole 2, wire 1, i_pk = 250, ftf = 3.83, ftt = 103.638, SI = 0, Energy = 0, iter = 0, status = 0
+
+
+case 2, pole 3, wire 1, i_pk = 500, ftf = 3.83, ftt = 103.638, SI = 0, Energy = 0, iter = 0, status = 0
+

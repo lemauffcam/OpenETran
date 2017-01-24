@@ -132,10 +132,34 @@ def deleteLPM(self, grid):
 
 def addMeter(self, grid):
     names = ['Meter', '/', '/', '/',
-             'Type', '', 'Pairs', '',
+             'Type', '//', 'Pairs', '',
              'Poles', '', '/', '/']
 
-    addWidgets(grid, names, 3, 4)
+    count = grid.count()
+    rowStart = int(count / 4)
+    rowEnd = rowStart + 3
+    positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(4)]
+
+    for position, name in zip(positions, names):
+        if name == '':
+            widget = QLineEdit()
+
+        elif name == '/':
+            widget = QLabel()
+
+        elif name == '//':
+            widget = QComboBox()
+            widget.addItem('Voltage')
+            widget.addItem('Arrester/Arrbez current')
+            widget.addItem('Ground current')
+            widget.addItem('Customer house current')
+            widget.addItem('Transformer X2 term. current')
+            widget.addItem('Pipegap current')
+
+        else:
+            widget = QLabel(name)
+
+        grid.addWidget(widget, *position)
 
 def deleteMeter(self, grid):
     # 16 is the number of elements when the tab was first created (including buttons)
@@ -176,36 +200,39 @@ def deleteLabel(self, grid):
 
 def addResistor(self, grid):
     names = ['Resistor', '/', '/', '/',
-             'Value (Ohm)', '', '/', '/']
+             'Value (Ohm)', '', 'Pairs', '',
+             'Poles', '', '/', '/']
 
-    addWidgets(grid, names, 2, 4)
+    addWidgets(grid, names, 3, 4)
 
 def deleteResistor(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 12, 2, 4)
+    removeWidgets(grid, 16, 3, 4)
 
 def addCapacitor(self, grid):
     names = ['Capacitor', '/', '/', '/',
-             'Value (F)', '', '/', '/']
+             'Value (F)', '', 'Pairs', '',
+             'Poles', '', '/', '/']
 
-    addWidgets(grid, names, 2, 4)
+    addWidgets(grid, names, 3, 4)
 
 def deleteCapacitor(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 12, 2, 4)
+    removeWidgets(grid, 16, 3, 4)
 
 def addInductor(self, grid):
     names = ['Inductor', '/', '/', '/',
-             'Series resistance (Ohm)', '', 'Value (H)', '']
+             'Series resistance (Ohm)', '', 'Value (H)', '',
+             'Pairs', '', 'Poles', '']
 
-    addWidgets(grid, names, 2, 4)
+    addWidgets(grid, names, 3, 4)
 
 def deleteInductor(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 12, 2, 4)
+    removeWidgets(grid, 16, 3, 4)
 
 def addCustomer(self, grid):
     names = ['Customer', '/', '/', '/', '/', '/',
@@ -213,22 +240,24 @@ def addCustomer(self, grid):
              'Lhg (H/m)', '', 'Ground lead length (m)', '', 'Transf. turns ratio', '',
              'Lp (H)', '', 'Ls1 (H)', '', 'Ls2 (H)', '',
              'Lcm (H/m)', '', 'rA (m)', '', 'rN (m)', '',
-             'Dan (m)', '', 'Daa (m)', '', 'Service drop length (m)', '']
+             'Dan (m)', '', 'Daa (m)', '', 'Service drop length (m)', '',
+             'Pairs', '', 'Poles', '', '/', '/']
 
-    addWidgets(grid, names, 6, 6)
+    addWidgets(grid, names, 7, 6)
 
 def deleteCustomer(self, grid):
     # 42 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 42, 6, 6)
+    removeWidgets(grid, 48, 7, 6)
 
 def addPipegap(self, grid):
     names = ['Pipegap', '/', '/', '/',
-             'CFO between conductors (V)', '', 'Series resistance (Ohm)', '']
+             'CFO between conductors (V)', '', 'Series resistance (Ohm)', '',
+             'Pairs', '', 'Poles', '']
 
-    addWidgets(grid, names, 2, 4)
+    addWidgets(grid, names, 3, 4)
 
 def deletePipegap(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 12, 2, 4)
+    removeWidgets(grid, 16, 3, 4)

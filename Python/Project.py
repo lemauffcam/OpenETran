@@ -39,10 +39,6 @@ def loadProject(self, guiNormal):
         with open(name + '.json', 'r') as f:
             openetran = json.load(f)
 
-        # By default we start with the simplified GUI
-        if guiNormal.isChecked() == True:
-            guiNormal.toggle()
-
         for k in openetran.keys():
             # If we find the arrester key, then we need to display the extended interface
             if k == 'arrester' and guiNormal.isChecked() == False:
@@ -53,7 +49,7 @@ def loadProject(self, guiNormal):
         WriteGUI.write(self, openetran, dispNormal)
 
 # Parses input file from main structure and calls openetran
-def simulateProject(openetran):
+def simulateProject(plotMode, self, openetran):
     outputDict = dict()
 
     # Writes main structure in openetran .dat input file
@@ -61,17 +57,30 @@ def simulateProject(openetran):
 
     # Calls openetran with the input file, output as a .csv file
     inputFileName = openetran['name'] + '.dat'
-    completedProcess = subprocess.run(["openetran.exe", "-plot", "csv", inputFileName],
+
+    if plotMode.isChecked() == True:
+        completedProcess = subprocess.run(["openetran.exe", "-plot", "csv", inputFileName],
                                       stderr=subprocess.PIPE, universal_newlines=True)
 
-    if 'OpenEtran Error' in completedProcess.stderr:
-        print(completedProcess.stderr)
-        return
+        if 'OpenEtran Error' in completedProcess.stderr:
+            print(completedProcess.stderr)
+            return
+
+        else:
+            # Interpreting the output .csv file
+            outputFileName = openetran['name'] + '.csv'
+            CSVRead.read(openetran, outputFileName, outputDict)
+
+            # Plot the data using Mathplotlib
+            Plot2D.draw(outputDict)
 
     else:
-        # Interpreting the output .csv file
-        outputFileName = openetran['name'] + '.csv'
-        CSVRead.read(openetran, outputFileName, outputDict)
+        grid = self.Simulation.layout()
+        pole1 = grid.itemAtPosition(3, 3).widget().text()
+        pole2 = grid.itemAtPosition(4, 3).widget().text()
+        wire = grid.itemAtPosition(5, 3).widget().text()
 
-        # Plot the data using Mathplotlib
-        Plot2D.draw(outputDict)
+        completedProcess = subprocess.run(["openetran.exe", "-icrit", pole1, pole2, wire, inputFileName],
+                                      stderr=subprocess.PIPE, stdout = subprocess.PIPE, universal_newlines=True)
+
+        print(completedProcess.stdout)

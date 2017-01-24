@@ -14,6 +14,10 @@ def draw(outputDict):
     time = outputDict['Time']
     arr = list()
     gd = list()
+    volt = list()
+    pipe = list()
+    tX2 = list()
+    house = list()
 
     for k in outputDict.keys():
         # Arrester current in figure 1
@@ -36,10 +40,69 @@ def draw(outputDict):
             plt.plot(time, outputDict[k])
             gd.append(k)
 
-    plt.figure(1)
-    plt.legend(arr)
+        # Pipegap current
+        elif 'IPIPE' in k:
+            plt.figure(3)
+            plt.xlabel('Time (s)')
+            plt.ylabel('Current (A)')
+            plt.title('Pipegap Current')
 
-    plt.figure(2)
-    plt.legend(gd)
+            plt.plot(time, outputDict[k])
+            pipe.append(k)
+
+        # Transformer X2 terminal current
+        elif 'IX2' in k:
+            plt.figure(4)
+            plt.xlabel('Time (s)')
+            plt.ylabel('Current (A)')
+            plt.title('Transformer X2 terminal current')
+
+            plt.plot(time, outputDict[k])
+            tX2.append(k)
+
+        # House ground current
+        elif 'IHG' in k:
+            plt.figure(5)
+            plt.xlabel('Time (s)')
+            plt.ylabel('Current (A)')
+            plt.title('House ground current')
+
+            plt.plot(time, outputDict[k])
+            house.append(k)
+
+        # Pole voltages
+        else:
+            plt.figure(6)
+            plt.xlabel('Time (s)')
+            plt.ylabel('Voltage (V)')
+            plt.title('Pole voltages')
+
+            plt.plot(time, outputDict[k])
+            volt.append(k)
+
+
+    if len(arr) > 0:
+        plt.figure(1)
+        plt.legend(arr)
+
+    if len(gd) > 0:
+        plt.figure(2)
+        plt.legend(gd)
+
+    if len(pipe) > 0:
+        plt.figure(3)
+        plt.legend(pipe)
+
+    if len(tX2) > 0:
+        plt.figure(4)
+        plt.legend(tX2)
+
+    if len(house) > 0:
+        plt.figure(5)
+        plt.legend(house)
+
+    if len(volt) > 0:
+        plt.figure(6)
+        plt.legend(volt)
 
     plt.show()
