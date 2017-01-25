@@ -25,16 +25,19 @@ extern char ground_token[];
 
 #define U0		1.256637061e-6 /* Free space magnetic permeability */
 #define EPS0	8.8419412828e-12 /* Free space electric permittivity */
-#define Y_OPEN  1.0e-9      /* admittance for an "open circuit" */
+#define Y_OPEN	1e-009 /* Open Circuit admittance */
+#define Y_CLOSE 1e+009 /* Short circuit admittance */
 
 struct ground {
 	double R60; /* power frequency resistance */
 	double y60; /* admittance for R60 */
 	double Ri;  /* impulse ground resistance at present time step */
+	double Yi;  /* impulse ground admittance at present time step */
 	double Ig;  /* soil ionization current */
 	double y;   /* admittance for the pole y matrix */
 	double h;   /* past history current for built-in inductance */
 
+	int counterpoise; /* 1 if there's a counterpoise, 0 otherwise */
 	double depthC; /* Depth in m. of counterpoise conductor */
 	double radiusC; /* Radius in m. of counterpoise conductor */
 	double lengthC; /* Total length in m. of counterpoise conductor */

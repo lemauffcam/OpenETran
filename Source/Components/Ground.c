@@ -65,21 +65,35 @@ void check_ground (struct ground *ptr) {
 	ptr->amps = It;
 	Imag = fabs (It);
 
-	/* We start by solving for the voltages at each node */
-	gsl_vector_set(ptr->current, 0, It);
-	gsl_linalg_LU_solve(ptr->yTri, ptr->yPerm, ptr->current, ptr->voltage);
+	/* Counterpoise model if there's a counterpoise at the base of each pole */
+	if (ptr->counterpoise) {
+		/* We start by solving for the voltages at each node */
+		gsl_vector_set(ptr->current, 0, It);
+		gsl_linalg_LU_solve(ptr->yTri, ptr->yPerm, ptr->current, ptr->voltage);
 
-	/* We then update the currents and the Ybus matrix for the next time step */
-	updateModel(ptr);
+		/* We then update the currents and the Ybus matrix for the next time step */
+		updateModel(ptr);
+
+		/* Updated ground voltage */
+		Vg = gsl_vector_get(ptr->voltage, 0);
+
+		/* Current ground impulse resistance */
+		if (Vg) {
+			ptr->Yi = It / Vg;
+
+			/* Bias current to add at node 0 so that Vg equals Vt */
+			ptr->i_bias = (Vt - Vg) * ptr->Yi;
+
+		} else {
+			ptr->i_bias = 0;
+		}
 	
-	/* Updated ground voltage */
-	Vg = gsl_vector_get(ptr->voltage, 0);
-
-	/* Current ground impulse resistance */
-	ptr->Ri = Vg / It;
-
-	/* Bias current to add at node 0 so that Vg equals Vt */
-	ptr->i_bias = (Vt - Vg) / ptr->Ri;
+	} else {
+		ptr->Ri = ptr->R60 / sqrt (1.0 + Imag / ptr->Ig); /* desired impulse resistance */
+		Vg = It * ptr->Ri; /* ground voltage rise caused by Ri times It */
+		/* inject this current into R60 to produce a back emf, so total ground voltage is Vg */
+		ptr->i_bias = Vg * (1.0 / ptr->Ri - ptr->y60);
+	}
 
 	/* update past history of the built-in ground inductance */
 	Vl = Vt - Vg;
@@ -140,46 +154,44 @@ int read_ground (void)
 {
 	int i, j, k;
 	double R60, Rho, e0, L, length;
-	double radius = 1, lengthC = 1, depth = 1, perm = 1; /* Counterpoise conductor parameters */
+	double radius, lengthC, depth, perm; /* Counterpoise conductor parameters */
 	int numberSegment;
 	struct ground *ptr;
 	int monitor;
 	double *target;
+
+	int counterpoise = 0;
 	
 	(void) next_double (&R60);
+	if (!R60) oe_exit(ERR_R60_GROUND);
+
 	if (R60 < 0.0) { /* input R60 < 0 means we want an ammeter */
 		R60 *= -1.0;
 		monitor = 1;
 	} else {
 		monitor = 0;
 	}
+
 	(void) next_double (&Rho);
+	if (!Rho) oe_exit(ERR_RHO_GROUND);
+
 	(void) next_double (&e0);
 	(void) next_double (&L);
 	(void) next_double (&length);
 
-	(void)next_double(&radius);
+	/* The "next_double" function returns 1 if there's no data */
+	if (!next_double(&radius)) {
+		counterpoise = 1;
 
-	/* If radius is 0, then there's no counterpoise conductor */
-	if (radius > 0.0) {
-		(void) next_double (&lengthC);
-		(void) next_double (&depth);
-		(void) next_int (&numberSegment);
-		(void) next_double (&perm);
+		if (next_double(&depth)) oe_exit(ERR_COUNTERPOISE);
+		if (next_double(&lengthC)) oe_exit(ERR_COUNTERPOISE);
+		if (next_int(&numberSegment)) oe_exit(ERR_COUNTERPOISE);
+		if (next_double(&perm)) oe_exit(ERR_COUNTERPOISE);
 
-		/* Must be >= 1, if there's an err the ground is considered to have no counterpoise */
-		if (numberSegment < 1) {
-			fprintf(logfp, "Err, the number of segments in the counterpoise can't be less than 1\n");
-			radius = 0;
-			lengthC = 0;
-			depth = 0;
-			numberSegment = 0;
-		}
-
-	} else {
-		lengthC = 0;
-		depth = 0;
-		numberSegment = 0;
+		if (numberSegment < 1) oe_exit(ERR_NO_SEGMENT);
+		if (radius <= 0) oe_exit(ERR_COUNT_RADIUS);
+		if (depth <= 0) oe_exit(ERR_DEPTH);
+	
 	}
 
 	L *= length;
@@ -188,7 +200,10 @@ int read_ground (void)
 	(void) reset_assignments ();
 	while (!next_assignment (&i, &j, &k)) {
 		ptr = add_ground (i, j, k, R60, Rho, e0, L);
-		add_counterpoise(ptr, radius, lengthC, depth, numberSegment, Rho, perm, e0);
+
+		if (counterpoise) {
+			add_counterpoise(ptr, radius, lengthC, depth, numberSegment, Rho, perm, e0);
+		}
 
 		if (monitor) {
 			target = &(ptr->amps);
@@ -206,7 +221,7 @@ void reset_ground (struct ground *ptr)
 	ptr->i = 0.0;
 	ptr->i_bias = 0.0;
 	ptr->amps = 0.0;
-	ptr->Ri = ptr->R60; 
+	ptr->Ri = ptr->R60;
 }
 
 /* add a new ground struct to the linked list, called either by read_ground
@@ -235,6 +250,10 @@ double R60, double Rho, double e0, double L)
 		reset_ground (ptr);
 		ground_ptr->next = ptr;
 		ground_ptr = ptr;
+
+		/* No counterpoise by default */
+		ptr->counterpoise = 0;
+
 		return (ptr);
 	} else {
 		if (logfp) fprintf( logfp, "can't allocate new ground\n");
@@ -250,6 +269,7 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	int signum;
 	
 	ptr->numSeg = numSeg;
+	ptr->counterpoise = 1;
 
 	/* No counterpoise here */
 	if (!numSeg) {
@@ -367,7 +387,7 @@ void updateModel(struct ground *ptr) {
 		/* Update history current again with the new value of Ci (conservation of charge) */
 		gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
 
-		/* New admittance value for the Ybus matrix*/
+		/* New admittance value for the Ybus matrix */
 		y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
 		gsl_matrix_set(ptr->Ybus, k, k, y);
 
@@ -410,25 +430,6 @@ void updateModel(struct ground *ptr) {
 	/* Triangularization of Ybus */
 	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
 	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
-
-	/* temporary output logging */
-	if (NULL == fp)	{
-		fp = fopen("cpground.csv", "w"); /* let fp close when the program exits */
-		fprintf(fp, "t,");
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "I%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "V%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "C%d,", k);
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "G%d,", k);
-		fprintf(fp, "\n");
-	}
-	if (NULL != fp)	{
-		fprintf(fp, "%G,", t);
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->current, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->voltage, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Ci, k));
-		for (k = 0; k < ptr->numSeg; k++) fprintf(fp, "%G,", gsl_vector_get(ptr->Gi, k));
-		fprintf(fp, "\n");
-	}
 
 	return;
 } /* updateModel */
