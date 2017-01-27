@@ -51,7 +51,6 @@ void updateModel(struct ground *ptr);
 
 char ground_token[] = "ground";
 struct ground *ground_head, *ground_ptr;
-static FILE *fp = NULL;  /* assumes just one active counterpoise in the model */
 
 /* see if the ground resistance is reduced by impulse current flow */
 void check_ground (struct ground *ptr) {
@@ -266,7 +265,7 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 						double rho, double perm, double e0) {
 
 	double li, ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
-	int signum;
+	int signum, i, j;
 	
 	ptr->numSeg = numSeg;
 	ptr->counterpoise = 1;
@@ -313,14 +312,14 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	Ci = shuntCapa(ptr, a) + shuntCapa(ptr, 2 * h - a);
 	Gi = Ci / (perm * EPS0 * rho);
 
-	for (int i = 0; i < numSeg; i++) {
+	for (i = 0; i < numSeg; i++) {
 		gsl_vector_set(ptr->Ci, i, Ci);
 		gsl_vector_set(ptr->Gi, i, Gi);
 	}
 
 	/* Fill out Ybus matrix */
-	for (int i = 0; i < numSeg; i++) {
-		for (int j = 0; j < numSeg; j++) {
+	for (i = 0; i < numSeg; i++) {
+		for (j = 0; j < numSeg; j++) {
 			if (i == j) {
 				y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
 			
