@@ -53,6 +53,12 @@
 #define	ERR_OUT_OF_RANGE   	20
 #define ERR_BAD_ARR_VI      21
 #define ERR_MIXED_LINES     22
+#define ERR_COUNT_RADIUS	23
+#define ERR_NO_SEGMENT		24
+#define ERR_COUNTERPOISE	25
+#define ERR_DEPTH			26
+#define ERR_R60_GROUND		27
+#define ERR_RHO_GROUND		28
 
 void oe_exit (int i);
 

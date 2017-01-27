@@ -30,10 +30,6 @@
 #define strnicmp strncasecmp
 #endif
 
-#ifdef __APPLE__
-#define strnicmp strncasecmp
-#endif
-
 #define STREAM_LEN 4096
 #define INPUT_EXT      ".dat"
 #define OUTPUT_EXT     ".out"
@@ -71,7 +67,7 @@ int main (int argc, char *argv[])
 	logfp = fopen ("openetran.log", "w");
 	if (argc >= 4) {
 		strcpy (buf, argv[1]);
-		if (strnicmp (buf, "-p", 2) == 0) { // single-shot run with plots
+		if (_strnicmp (buf, "-p", 2) == 0) { // single-shot run with plots
 			strcpy (buf, argv[2]);
 			switch (tolower (buf[0])) {
 				case 'c': plot_type = PLT_CSV; break;
@@ -79,7 +75,7 @@ int main (int argc, char *argv[])
 				case 'e': plot_type = PLT_ELT; break;
 				default: plot_type = PLT_NONE; break;
 			}
-		} else if (strnicmp (buf, "-i", 2) == 0) { // critical current iterations
+		} else if (_strnicmp (buf, "-i", 2) == 0) { // critical current iterations
 			iteration_mode = FIND_CRITICAL_CURRENT;
 			stop_on_flashover = TRUE;
 		} else {
@@ -208,7 +204,13 @@ static char *err_msg[] = {
 	"Calculation error in math library", //	ERR_MATH_CALC   	19
 	"Subscript out of range", //	ERR_OUT_OF_RANGE   	20
 	"No arrester discharge voltage defined", // ERR_BAD_ARR_VI      21
-	"Mixed conductor and cable input for same span" // ERR_MIXED_LINES 22
+	"Mixed conductor and cable input for same span", // ERR_MIXED_LINES 22
+	"Counterpoise radius must be strictly positive", // ERR_COUNT_RADIUS 23
+	"Number of segments for the counterpoise must be >= 1", // ERR_NO_SEGMENT 24
+	"Missing counterpoise parameter", // ERR_COUNTERPOISE 25
+	"Counterpoise depth must be strictly positive", // ERR_DEPTH 26
+	"Ground R60 resistance can't be 0", // ERR_R60_GROUND 27
+	"Ground resistivity can't be 0" // ERR_RHO_GROUND 28
 };
 
 void oe_exit (int i)
