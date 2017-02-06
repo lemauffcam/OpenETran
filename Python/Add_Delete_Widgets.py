@@ -12,7 +12,10 @@ from PyQt5.QtWidgets import (QLineEdit, QLabel, QComboBox)
 # General function to add widgets
 def addWidgets(grid, names, rowOffset, numCol):
     count = grid.count()
-    rowStart = int(count / numCol)
+    rowStart = int(count / numCol)  # Number of colums and number of elements are
+                                    # always even, so the result will always be an int.
+                                    # Still needs to be converted because the result is
+                                    # typed as a float by default
     rowEnd = rowStart + rowOffset
     positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(numCol)]
 
@@ -31,9 +34,10 @@ def addWidgets(grid, names, rowOffset, numCol):
 # General function to remove widgets
 def removeWidgets(grid, initCount, rowOffset, numCol):
     count = grid.count()
+
+    # No widgets left to delete
     if count == initCount:
-        print('No widgets left to delete')
-        return
+        return 1
 
     else:
         rowEnd = int(count / numCol)
@@ -44,6 +48,8 @@ def removeWidgets(grid, initCount, rowOffset, numCol):
     for position in positions:
         widget = grid.itemAtPosition(position[0], position[1]).widget()
         widget.setParent(None)
+
+    return 0
 
 def addConductor(self, grid):
     names = ['Conductor', '/', '/', '/',
@@ -56,7 +62,7 @@ def addConductor(self, grid):
 def deleteConductor(self, grid):
     # 24 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 20, 4, 4)
+    return removeWidgets(grid, 20, 4, 4)
 
 def addGround(self, grid):
     names = ['Ground', '/', '/', '/', '/', '/',
@@ -66,14 +72,20 @@ def addGround(self, grid):
              'Counterpoise radius (m)', '', 'Counterpoise depth (m)', '',
              'Counterpoise length (m)', '', 'Number of segments', '',
              'Soil relative permittivity', '',
-             'Pairs', '', 'Poles', '']
+             'Pairs', '', 'Poles', '',
+             'R60 counterpoise', '/', '/', '/', '/', '/']
 
-    addWidgets(grid, names, 5, 6)
+    addWidgets(grid, names, 6, 6)
+
+    # R60 value label
+    rowCount = int(grid.count() / 6)
+    label = grid.itemAtPosition(rowCount - 1, 1).widget()
+    label.setText('N/A')
 
 # Function strictly identical to the one deleting conductors. No need to rewrite it.
 def deleteGround(self, grid):
     # 36 is the number of elements when the tab was first created (including buttons)
-    removeWidgets(grid, 36, 5, 6)
+    return removeWidgets(grid, 42, 6, 6)
 
 def addArrester(self, grid):
     names = ['Arrester', '/', '/', '/',
@@ -87,7 +99,7 @@ def addArrester(self, grid):
 def deleteArrester(self, grid):
     # 24 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 24, 5, 4)
+    return removeWidgets(grid, 24, 5, 4)
 
 def addArrbez(self, grid):
     names = ['Arrbez', '/', '/', '/',
@@ -102,7 +114,7 @@ def addArrbez(self, grid):
 def deleteArrbez(self, grid):
     # 24 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 24, 5, 4)
+    return removeWidgets(grid, 24, 5, 4)
 
 def addInsulator(self, grid):
     names = ['Insulator', '/', '/', '/',
@@ -115,7 +127,7 @@ def addInsulator(self, grid):
 def deleteInsulator(self, grid):
     # 20 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 20, 4, 4)
+    return removeWidgets(grid, 20, 4, 4)
 
 def addLPM(self, grid):
     names = ['LPM', '/', '/', '/',
@@ -128,7 +140,7 @@ def addLPM(self, grid):
 def deleteLPM(self, grid):
     # 20 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 20, 4, 4)
+    return removeWidgets(grid, 20, 4, 4)
 
 def addMeter(self, grid):
     names = ['Meter', '/', '/', '/',
@@ -164,7 +176,7 @@ def addMeter(self, grid):
 def deleteMeter(self, grid):
     # 16 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 16, 3, 4)
+    return removeWidgets(grid, 16, 3, 4)
 
 def addLabel(self, grid):
     count = grid.count()
@@ -196,7 +208,7 @@ def addLabel(self, grid):
 def deleteLabel(self, grid):
     # 16 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 16, 3, 4)
+    return removeWidgets(grid, 16, 3, 4)
 
 def addResistor(self, grid):
     names = ['Resistor', '/', '/', '/',
@@ -208,7 +220,7 @@ def addResistor(self, grid):
 def deleteResistor(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 16, 3, 4)
+    return removeWidgets(grid, 16, 3, 4)
 
 def addCapacitor(self, grid):
     names = ['Capacitor', '/', '/', '/',
@@ -220,7 +232,7 @@ def addCapacitor(self, grid):
 def deleteCapacitor(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 16, 3, 4)
+    return removeWidgets(grid, 16, 3, 4)
 
 def addInductor(self, grid):
     names = ['Inductor', '/', '/', '/',
@@ -232,7 +244,7 @@ def addInductor(self, grid):
 def deleteInductor(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 16, 3, 4)
+    return removeWidgets(grid, 16, 3, 4)
 
 def addCustomer(self, grid):
     names = ['Customer', '/', '/', '/', '/', '/',
@@ -248,7 +260,7 @@ def addCustomer(self, grid):
 def deleteCustomer(self, grid):
     # 42 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 48, 7, 6)
+    return removeWidgets(grid, 48, 7, 6)
 
 def addPipegap(self, grid):
     names = ['Pipegap', '/', '/', '/',
@@ -260,4 +272,4 @@ def addPipegap(self, grid):
 def deletePipegap(self, grid):
     # 12 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    removeWidgets(grid, 16, 3, 4)
+    return removeWidgets(grid, 16, 3, 4)

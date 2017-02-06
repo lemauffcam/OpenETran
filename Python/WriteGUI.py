@@ -26,10 +26,13 @@ def writeWidgets(openetran, grid, name, rowOffset, numCol, notEven):
         positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(1, numCol, 2)]
         k = 0
 
+        # If the number of text fields in not even, then the widget on the bottom right of
+        # the read element will be a label, so it is ignored
         if notEven == 1:
             for position in positions:
                 count = (position[0] + 1) * (position[1] + 1)
 
+                # Bottom right element is a label, we ignore it
                 if position[0] == (rowEnd - 1) and position[1] == (numCol-1):
                     continue
 
@@ -114,6 +117,11 @@ def writeSimulation(self, openetran):
 
 def writeConductor(self, openetran):
     grid = self.Conductor.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteConductor(self, grid)
 
     # Number of conductors in the system
     num = len(openetran['conductor'])
@@ -124,8 +132,14 @@ def writeConductor(self, openetran):
 
     writeWidgets(openetran, grid, 'conductor', 3, 4, 1)
 
+# Particular case in ground because we don't write in the last row
 def writeGround(self, openetran):
     grid = self.Ground.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteGround(self, grid)
 
     # Number of grounds in the system
     num = len(openetran['ground'])
@@ -134,7 +148,35 @@ def writeGround(self, openetran):
         for k in range(num - 1):
             Add_Delete_Widgets.addGround(self, grid)
 
-    writeWidgets(openetran, grid, 'ground', 4, 6, 0)
+    countTotal = grid.count()
+    count = 0 # current count of the elements in the layout
+    i = 0 # index of the current list (each key containing a list of lists)
+
+    rowStart = 2
+    rowEnd = rowStart + 5
+
+    while count < countTotal:
+        # List of positions of each text fields in the layout
+        positions = [(a,b) for a in range(rowStart, rowEnd) for b in range(1, 6, 2)]
+        k = 0
+
+
+        for position in positions:
+            count = (position[0] + 1) * (position[1] + 1)
+
+            if position[0] == rowEnd-1:
+                continue
+
+            else:
+                v = openetran['ground'][i][k]
+                widget = grid.itemAtPosition(position[0], position[1]).widget()
+                widget.setText(v)
+                k += 1
+
+        rowStart = rowEnd + 1
+        rowEnd = rowStart + 5
+        i += 1
+        k = 0
 
 def writeSurge(self, openetran):
     grid = self.Surge.layout()
@@ -153,6 +195,11 @@ def writeSteepfront(self, openetran):
 # Particular case in Arrester (see while loop)
 def writeArrester(self, openetran):
     grid = self.Arrester.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteArrester(self, grid)
 
     # Number of arresters in the system
     num = len(openetran['arrester'])
@@ -165,6 +212,11 @@ def writeArrester(self, openetran):
 
 def writeArrbez(self, openetran):
     grid = self.Arrbez.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteArrbez(self, grid)
 
     # Number of arrbez in the system
     num = len(openetran['arrbez'])
@@ -177,6 +229,11 @@ def writeArrbez(self, openetran):
 
 def writeInsulator(self, openetran):
     grid = self.Insulator.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteInsulator(self, grid)
 
     # Number of insulators in the system
     num = len(openetran['insulator'])
@@ -190,6 +247,11 @@ def writeInsulator(self, openetran):
 # Particular case in LPM
 def writeLPM(self, openetran):
     grid = self.LPM.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteLPM(self, grid)
 
     # Number of LPMs in the system
     num = len(openetran['lpm'])
@@ -202,6 +264,11 @@ def writeLPM(self, openetran):
 
 def writeMeter(self, openetran):
     grid = self.Meter.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteMeter(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['meter'])
@@ -210,6 +277,7 @@ def writeMeter(self, openetran):
         for k in range(num - 1):
             Add_Delete_Widgets.addMeter(self, grid)
 
+    # Different version of writeWidgets because there are ComboBoxes in the layout
     countTotal = grid.count()
     count = 0 # current count of the elements in the layout
     i = 0 # index of the current list (each key containing a list of lists)
@@ -254,6 +322,11 @@ def writeMeter(self, openetran):
 
 def writeLabel(self, openetran):
     grid = self.Label.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteLabel(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['label'])
@@ -262,6 +335,7 @@ def writeLabel(self, openetran):
         for k in range(num - 1):
             Add_Delete_Widgets.addLabel(self, grid)
 
+    # Different version of the writeWidget function because there are ComboBoxes in the layout
     countTotal = grid.count()
     count = 0 # current count of the elements in the layout
     i = 0 # index of the current list (each key containing a list of lists)
@@ -306,6 +380,11 @@ def writeLabel(self, openetran):
 
 def writeResistor(self, openetran):
     grid = self.Resistor.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteResistor(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['resistor'])
@@ -318,6 +397,11 @@ def writeResistor(self, openetran):
 
 def writeCapacitor(self, openetran):
     grid = self.Capacitor.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteCapacitor(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['capacitor'])
@@ -330,6 +414,11 @@ def writeCapacitor(self, openetran):
 
 def writeInductor(self, openetran):
     grid = self.Inductor.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteInductor(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['inductor'])
@@ -342,6 +431,11 @@ def writeInductor(self, openetran):
 
 def writeCustomer(self, openetran):
     grid = self.Customer.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deleteCustomer(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['customer'])
@@ -354,6 +448,11 @@ def writeCustomer(self, openetran):
 
 def writePipegap(self, openetran):
     grid = self.Pipegap.layout()
+    status = 0
+
+    # Status = 1 when no widgets are left to delete
+    while status == 0:
+        status = Add_Delete_Widgets.deletePipegap(self, grid)
 
     # Number of Meters in the system
     num = len(openetran['pipegap'])

@@ -17,16 +17,22 @@ def readWidgets(openetran, grid, name, rowOffset, numCol, notEven):
     rowEnd = rowStart + rowOffset
 
     while count < countTotal:
+        # Positions of all text fields in each element of the tab
         positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(1, numCol, 2)]
         listParam = list()
 
+        # If the number of text fields is not even, the widget at the bottom right of the read
+        # element will be a label, so it's ignored.
         if notEven == 1:
             for position in positions:
                 count = (position[0] + 1) * (position[1] + 1)
 
+                # Bottom right widget is a label, so we ignore it
                 if position[0] == (rowEnd - 1) and position[1] == (numCol-1):
                     continue
+
                 else:
+                    # Get the text and append it in the list
                     widget = grid.itemAtPosition(position[0], position[1]).widget()
                     listParam.append(widget.text())
         else:
@@ -36,8 +42,8 @@ def readWidgets(openetran, grid, name, rowOffset, numCol, notEven):
                 widget = grid.itemAtPosition(position[0], position[1]).widget()
                 listParam.append(widget.text())
 
+        # Append the list of values (which makes a whole element) in the key list
         openetran[name].append(listParam)
-        count = (position[0] + 1) * (position[1] + 1)
         rowStart = rowEnd + 1
         rowEnd = rowStart + rowOffset
 
@@ -59,6 +65,7 @@ def read(self, nameTextField, guiNormal):
     openetran['meter'] = list()
     openetran['label'] = list()
 
+    # Only read steepfront, arrester etc. when we're in extended view
     if guiNormal.isChecked() == True:
         openetran['steepfront'] = list()
         openetran['arrester'] = list()
@@ -131,9 +138,36 @@ def readConductor(self, openetran):
     grid = self.Conductor.layout()
     readWidgets(openetran, grid, 'conductor', 3, 4, 1)
 
+# Particular case for ground because we don't need to read the last line (R60 label)
 def readGround(self, openetran):
     grid = self.Ground.layout()
-    readWidgets(openetran, grid, 'ground', 4, 6, 0)
+
+    countTotal = grid.count()
+    count = 0 # current count of the elements
+
+    rowStart = 2
+    rowEnd = rowStart + 5
+
+    while count < countTotal:
+        # Positions of all text fields in each element of the tab
+        positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(1, 6, 2)]
+        listParam = list()
+
+
+        for position in positions:
+            count = (position[0] + 1) * (position[1] + 1)
+
+            if position[0] == rowEnd - 1:
+                continue
+
+            else:
+                widget = grid.itemAtPosition(position[0], position[1]).widget()
+                listParam.append(widget.text())
+
+        # Append the list of values (which makes a whole element) in the key list
+        openetran['ground'].append(listParam)
+        rowStart = rowEnd + 1
+        rowEnd = rowStart + 5
 
 def readSurge(self, openetran):
     grid = self.Surge.layout()

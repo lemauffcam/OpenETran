@@ -9,11 +9,13 @@ openetran GUI
 
 import sys
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import (QTabWidget, QWidget, QGridLayout, QHBoxLayout,
+from PyQt5.QtWidgets import (QTabWidget, QWidget, QGridLayout,
                              QPushButton, QLineEdit, QLabel, QScrollArea,
                              QComboBox, QRadioButton)
-from PyQt5.QtCore import pyqtSlot, Qt
+from PyQt5.QtCore import pyqtSlot
 import Project, ReadStruct, Add_Delete_Widgets
+
+import R60
 
 # Function to add widgets on the tabs for the 1st time
 def addWidgets(grid, names, rowEnd, ColEnd):
@@ -22,7 +24,7 @@ def addWidgets(grid, names, rowEnd, ColEnd):
         if name == '':
             widget = QLineEdit()
 
-        elif name == 'New' or name == 'Delete':
+        elif name == 'New' or name == 'Delete' or name == 'Get Counterpoise R60':
             widget = QPushButton(name)
 
         elif name == '/':
@@ -46,24 +48,25 @@ class GUi_Tab(object):
 
         # Project Tab
         self.Project = QWidget()
-        hbox = QHBoxLayout()
+        grid = QGridLayout()
 
         save = QPushButton('Save')
         load = QPushButton('Load')
         projName = QLineEdit('Project_Name')
 
+        # RadioButtons to select the simplified or full interface. Simplified selected by default
         guiSimple = QRadioButton('Simplified interface')
         guiNormal = QRadioButton('Full interface')
 
         guiSimple.setChecked(True)
 
-        hbox.addWidget(save)
-        hbox.addWidget(load)
-        hbox.addWidget(projName)
-        hbox.addWidget(guiSimple)
-        hbox.addWidget(guiNormal)
+        grid.addWidget(save, 0, 0)
+        grid.addWidget(load, 0, 1)
+        grid.addWidget(projName, 0, 2)
+        grid.addWidget(guiSimple, 0, 3)
+        grid.addWidget(guiNormal, 0, 4)
 
-        self.Project.setLayout(hbox)
+        self.Project.setLayout(grid)
         Tab.addTab(self.Project, 'Project')
 
         # Simulation Tab
@@ -80,6 +83,7 @@ class GUi_Tab(object):
         simulate = QPushButton('Simulate !')
         grid.addWidget(simulate, 0,  3)
 
+        # RadioButtons for the simulation mode - One shot mode is selected by default
         plotMode = QRadioButton('One shot mode simulation')
         plotMode.setChecked(True)
         grid.addWidget(plotMode, 1, 3)
@@ -87,6 +91,7 @@ class GUi_Tab(object):
         critMode = QRadioButton('Critical current iteration simulation')
         grid.addWidget(critMode, 2, 3)
 
+        # LineEdit fields for Critical current iteration mode
         pole1 = QLineEdit('First pole to hit')
         pole2 = QLineEdit('Last pole to hit')
         wire = QLineEdit('Wire')
@@ -146,17 +151,18 @@ class GUi_Tab(object):
         grid = QGridLayout()
         self.Ground.setLayout(grid)
 
-        names = ['New', 'Delete', '/', '/', '/', '/',
+        names = ['New', 'Delete', 'Get Counterpoise R60', '/', '/', '/',
                  'Ground', '/', '/', '/', '/', '/',
-                 'R60 (Ohm)', '', 'Resistivity (Ohm.m)', '',
-                 'Soil Breakdown Gradient (V.m)', '',
-                 'Downlead Inductance (H/m)', '', 'Length of downlead (m)', '',
-                 'Counterpoise radius (m)', '', 'Counterpoise depth (m)', '',
-                 'Counterpoise length (m)', '', 'Number of segments', '',
-                 'Soil relative permittivity', '',
-                 'Pairs', '', 'Poles', '']
+                 'R60 (Ohm)', '', 'Resistivity (Ohm.m)', '', 'Soil Breakdown Gradient (V.m)', '',
+                 'Downlead Inductance (H/m)', '', 'Length of downlead (m)', '', 'Counterpoise radius (m)', '',
+                 'Counterpoise depth (m)', '', 'Counterpoise length (m)', '', 'Number of segments', '',
+                 'Soil relative permittivity', '', 'Pairs', '', 'Poles', '',
+                 'R60 counterpoise', '/', '/', '/', '/', '/']
 
-        addWidgets(grid, names, 6, 6)
+        addWidgets(grid, names, 7, 6)
+
+        label = grid.itemAtPosition(6,1).widget()
+        label.setText('N/A')
 
         Tab.addTab(self.Ground, 'Ground')
 
@@ -173,7 +179,7 @@ class GUi_Tab(object):
 
         Tab.addTab(self.Surge, 'Surge')
 
-        # Steepfront Tab
+        # Steepfront Tab - not added by default (not part of simplified interface)
         self.Steepfront = QWidget()
         grid = QGridLayout()
         self.Steepfront.setLayout(grid)
@@ -185,9 +191,7 @@ class GUi_Tab(object):
 
         addWidgets(grid, names, 7, 2)
 
-        # Tab.addTab(self.Steepfront, 'Steepfront')
-
-        # Arrester Tab
+        # Arrester Tab - not added by default (not part of simplified interface)
         self.Arrester = QScrollArea()
         grid = QGridLayout()
         self.Arrester.setLayout(grid)
@@ -200,8 +204,6 @@ class GUi_Tab(object):
                  'Poles', '', '/', '/']
 
         addWidgets(grid, names, 6, 4)
-
-        # Tab.addTab(self.Arrester, 'Arrester')
 
         # Arrbez Tab
         self.Arrbez = QScrollArea()
@@ -219,7 +221,7 @@ class GUi_Tab(object):
 
         Tab.addTab(self.Arrbez, 'Arrbez')
 
-        # Insulator Tab
+        # Insulator Tab - not added by default (not part of simplified interface)
         self.Insulator = QScrollArea()
         grid = QGridLayout()
         self.Insulator.setLayout(grid)
@@ -231,8 +233,6 @@ class GUi_Tab(object):
                  'Pairs', '', 'Poles', '']
 
         addWidgets(grid, names, 5, 4)
-
-        # Tab.addTab(self.Insulator, 'Insulator')
 
         # LPM Tab
         self.LPM = QScrollArea()
@@ -287,7 +287,7 @@ class GUi_Tab(object):
 
         Tab.addTab(self.Meter, 'Meter')
 
-        # Resistor Tab
+        # Resistor Tab - not added by default (not part of simplified interface)
         self.Resistor = QScrollArea()
         grid = QGridLayout()
         self.Resistor.setLayout(grid)
@@ -299,9 +299,7 @@ class GUi_Tab(object):
 
         addWidgets(grid, names, 4, 4)
 
-        # Tab.addTab(self.Resistor, 'Resistor')
-
-        # Capacitor Tab
+        # Capacitor Tab - not added by default (not part of simplified interface)
         self.Capacitor = QScrollArea()
         grid = QGridLayout()
         self.Capacitor.setLayout(grid)
@@ -312,8 +310,6 @@ class GUi_Tab(object):
                  'Poles', '', '/', '/']
 
         addWidgets(grid, names, 4, 4)
-
-        # Tab.addTab(self.Capacitor, 'Capacitor')
 
         # Inductor Tab
         self.Inductor = QScrollArea()
@@ -327,9 +323,7 @@ class GUi_Tab(object):
 
         addWidgets(grid, names, 4, 4)
 
-        # Tab.addTab(self.Inductor, 'Inductor')
-
-        # Customer Tab
+        # Customer Tab - not added by default (not part of simplified interface)
         self.Customer = QScrollArea()
         grid = QGridLayout()
         self.Customer.setLayout(grid)
@@ -345,9 +339,7 @@ class GUi_Tab(object):
 
         addWidgets(grid, names, 8, 6)
 
-        # Tab.addTab(self.Customer, 'Customer')
-
-        # Pipegap Tab
+        # Pipegap Tab - not added by default (not part of simplified interface)
         self.Pipegap = QScrollArea()
         grid = QGridLayout()
         self.Pipegap.setLayout(grid)
@@ -358,8 +350,6 @@ class GUi_Tab(object):
                  'Pairs', '', 'Poles', '']
 
         addWidgets(grid, names, 4, 4)
-
-        # Tab.addTab(self.Pipegap, 'Pipegap')
 
         @pyqtSlot()
         def dispNormal():
@@ -435,6 +425,11 @@ class GUi_Tab(object):
         @pyqtSlot()
         def deleteGround():
             Add_Delete_Widgets.deleteGround(self, self.Ground.layout())
+
+        @pyqtSlot()
+        def calculateR60():
+            openetran = ReadStruct.read(self, projName, guiNormal)
+            R60.calcR60(openetran, self.Ground.layout())
 
         @pyqtSlot()
         def newArrester():
@@ -536,6 +531,9 @@ class GUi_Tab(object):
         # Ground
         layout = self.Ground.layout()
         connectButtons(layout, newGround, deleteGround)
+
+        calcR60 = layout.itemAtPosition(0,2).widget()
+        calcR60.pressed.connect(calculateR60)
 
         # Arrester
         layout = self.Arrester.layout()

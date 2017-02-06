@@ -13,13 +13,14 @@ def writeKey(f, openetran, key):
 
     for v in openetran[key]:
         # We first check if evey field has been written in (counterpoise fields
-        # in "ground" are optionnal)
+        # in "ground" are optionnal so it's a special case for that key)
         if key == 'ground':
             for i in range(5):
                 if v[i] == '':
                     err = 1
                     break
 
+            # Last 2 fields are Pairs and Poles, which are mandatory
             i = len(v)
             if v[i-1] == '' or v[i-2] == '':
                 err = 1

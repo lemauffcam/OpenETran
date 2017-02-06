@@ -12,6 +12,7 @@ import csv
 
 def read(openETran, fileName, plotDict):
     with open(fileName, 'r', newline = '') as csvFile:
+        # Read the csv file
         plots = csv.reader(csvFile, dialect = 'excel', delimiter = ',', quotechar = '|')
         keys = list()
 
@@ -19,11 +20,11 @@ def read(openETran, fileName, plotDict):
 
             # First step is to create the keys from the 1st line of the .csv file
             if 'Time' == row[0]:
-                for key in row:
-                    plotDict[key] = list()
-                    keys.append(key)
+                for k in row:
+                    plotDict[k] = list()
+                    keys.append(k)
 
             # We can then fill each list in the dict.
             else:
-                for j in range(len(keys)):
-                    (plotDict[keys[j]]).append(row[j])
+                for k in range(len(keys)):
+                    (plotDict[keys[k]]).append(row[k])

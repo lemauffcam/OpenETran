@@ -10,8 +10,13 @@ Plots the OpenETran curves
 import matplotlib.pyplot as plt
 
 def draw(outputDict):
-    # Time scale used as x-axis in the following figures
+
+    # Close all figures that could have been opened by another simulation instance
+    plt.close('all')
+
+    # Time scale used as x-axis in the figures
     time = outputDict['Time']
+
     arr = list()
     gd = list()
     volt = list()
@@ -70,6 +75,9 @@ def draw(outputDict):
             plt.plot(time, outputDict[k])
             house.append(k)
 
+        elif 'Time' in k:
+            continue
+
         # Pole voltages
         else:
             plt.figure(6)
@@ -81,6 +89,7 @@ def draw(outputDict):
             volt.append(k)
 
 
+    # Graphs legends
     if len(arr) > 0:
         plt.figure(1)
         plt.legend(arr)
