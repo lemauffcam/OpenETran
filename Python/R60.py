@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Feb 2 2017
-
 Calculates the 60Hz resistance of the counterpoise
-
 @author: Matthieu
 """
 
 import math
-import array
 
 def calcR60(openetran, grid):
     rowCount = grid.rowCount() - 1
@@ -42,7 +39,7 @@ def calcR60(openetran, grid):
         # Resistance as used in the counterpoise model (see documentation)
         ri = rho/(2*math.pi*li) * ( (2*h+a)/li + math.log((li + math.sqrt(li*li + a*a))/a) -
           math.sqrt(1 + math.pow(a/li, 2)) + math.log((li + math.sqrt(li*li + 4*h*h)) / (2*h)) -
-          math.sqrt(1 + math.pow(2 * h / li, 2)));
+          math.sqrt(1 + math.pow(2 * h / li, 2)) );
 
         # Capacitance and conductance (only conductance is used, but Ci is needed to calculate it)
         if 2*h-a > a:
@@ -76,6 +73,7 @@ def calcR60(openetran, grid):
 
     return
 
+# Shunt capacitance of the counterpoise in an infinite medium
 def shuntCapa(li, eps, a):
 	perm = eps * 8.8419412828E-12 # Soil permittivity
 
@@ -84,6 +82,7 @@ def shuntCapa(li, eps, a):
 
 	return C
 
+# Returns the array of DFF triangle coefficients (see documentation)
 def bCoeff(nSeg):
     b = [[0 for x in range(nSeg+1)] for y in range(nSeg+1)]
 
@@ -101,6 +100,7 @@ def bCoeff(nSeg):
 
     return b
 
+# Returns the array of DFFz triangle coefficients (see documentation)
 def cCoeff(nSeg):
     c = [[0 for x in range(nSeg+1)] for y in range(nSeg+1)]
 

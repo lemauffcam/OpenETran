@@ -1,21 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Jan 4 2017
-
-openetran GUI
-
+OpenEtran GUI main Python file
 @author: Matthieu Bertin - University of Pittsburgh
 """
 
 import sys
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import (QTabWidget, QWidget, QGridLayout,
-                             QPushButton, QLineEdit, QLabel, QScrollArea,
-                             QComboBox, QRadioButton)
+from PyQt5.QtWidgets import (QApplication, QTabWidget, QWidget, QGridLayout,
+                             QPushButton, QLineEdit, QLabel, QComboBox, QRadioButton)
 from PyQt5.QtCore import pyqtSlot
-import Project, ReadStruct, Add_Delete_Widgets
-
-import R60
+import Project, ReadStruct, Add_Delete_Widgets, R60, Draw
 
 # Function to add widgets on the tabs for the 1st time
 def addWidgets(grid, names, rowEnd, ColEnd):
@@ -99,7 +93,7 @@ class GUi_Tab(object):
         Tab.addTab(self.Simulation, 'Simulation')
 
         # Conductor Tab
-        self.Conductor = QScrollArea()
+        self.Conductor = QWidget()
         grid = QGridLayout()
         self.Conductor.setLayout(grid)
 
@@ -114,7 +108,7 @@ class GUi_Tab(object):
         Tab.addTab(self.Conductor, 'Conductors')
 
         # Label Tab
-        self.Label = QScrollArea()
+        self.Label = QWidget()
         grid = QGridLayout()
         self.Label.setLayout(grid)
 
@@ -147,7 +141,7 @@ class GUi_Tab(object):
         Tab.addTab(self.Label, 'Labels')
 
         # Ground Tab
-        self.Ground = QScrollArea()
+        self.Ground = QWidget()
         grid = QGridLayout()
         self.Ground.setLayout(grid)
 
@@ -192,7 +186,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 7, 2)
 
         # Arrester Tab - not added by default (not part of simplified interface)
-        self.Arrester = QScrollArea()
+        self.Arrester = QWidget()
         grid = QGridLayout()
         self.Arrester.setLayout(grid)
 
@@ -206,7 +200,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 6, 4)
 
         # Arrbez Tab
-        self.Arrbez = QScrollArea()
+        self.Arrbez = QWidget()
         grid = QGridLayout()
         self.Arrbez.setLayout(grid)
 
@@ -222,7 +216,7 @@ class GUi_Tab(object):
         Tab.addTab(self.Arrbez, 'Arrbez')
 
         # Insulator Tab - not added by default (not part of simplified interface)
-        self.Insulator = QScrollArea()
+        self.Insulator = QWidget()
         grid = QGridLayout()
         self.Insulator.setLayout(grid)
 
@@ -235,7 +229,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 5, 4)
 
         # LPM Tab
-        self.LPM = QScrollArea()
+        self.LPM = QWidget()
 
         grid = QGridLayout()
         self.LPM.setLayout(grid)
@@ -251,7 +245,7 @@ class GUi_Tab(object):
         Tab.addTab(self.LPM, 'LPM')
 
         # Meter Tab
-        self.Meter = QScrollArea()
+        self.Meter = QWidget()
         grid = QGridLayout()
         self.Meter.setLayout(grid)
 
@@ -288,7 +282,7 @@ class GUi_Tab(object):
         Tab.addTab(self.Meter, 'Meter')
 
         # Resistor Tab - not added by default (not part of simplified interface)
-        self.Resistor = QScrollArea()
+        self.Resistor = QWidget()
         grid = QGridLayout()
         self.Resistor.setLayout(grid)
 
@@ -300,7 +294,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 4, 4)
 
         # Capacitor Tab - not added by default (not part of simplified interface)
-        self.Capacitor = QScrollArea()
+        self.Capacitor = QWidget()
         grid = QGridLayout()
         self.Capacitor.setLayout(grid)
 
@@ -312,7 +306,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 4, 4)
 
         # Inductor Tab
-        self.Inductor = QScrollArea()
+        self.Inductor = QWidget()
         grid = QGridLayout()
         self.Inductor.setLayout(grid)
 
@@ -324,7 +318,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 4, 4)
 
         # Customer Tab - not added by default (not part of simplified interface)
-        self.Customer = QScrollArea()
+        self.Customer = QWidget()
         grid = QGridLayout()
         self.Customer.setLayout(grid)
 
@@ -340,7 +334,7 @@ class GUi_Tab(object):
         addWidgets(grid, names, 8, 6)
 
         # Pipegap Tab - not added by default (not part of simplified interface)
-        self.Pipegap = QScrollArea()
+        self.Pipegap = QWidget()
         grid = QGridLayout()
         self.Pipegap.setLayout(grid)
 
@@ -587,12 +581,14 @@ class GUi_Tab(object):
         critMode.toggled.connect(simCrit)
 
 if __name__ == '__main__':
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
 
     # Main tab window
     Tab = QTabWidget()
     ui = GUi_Tab()
     ui.setupUi(Tab)
+
+    sysView = Draw.SysView()
 
     Tab.show()
     sys.exit(app.exec_())

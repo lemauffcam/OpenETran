@@ -60,7 +60,9 @@ def simulateProject(plotMode, self, openetran):
     # One shot simulation mode with .csv plot files
     if plotMode.isChecked() == True:
         completedProcess = subprocess.run(["openetran.exe", "-plot", "csv", inputFileName],
-                                      stderr=subprocess.PIPE, universal_newlines=True)
+                          stderr=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
+
+        print(completedProcess.stdout)
 
         if 'OpenEtran Error' in completedProcess.stderr:
             print(completedProcess.stderr)
