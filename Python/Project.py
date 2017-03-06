@@ -2,18 +2,13 @@
 """
 Created on Wed Nov 16 2016
 
-Saves main structure into a JSON file
+Script with functions to save, load and simulate the project
 
-@author: Matthieu
+@author: Matthieu Bertin
 """
 
-import json
-import subprocess
-
-import WriteGUI
-import ParseInput
-import CSVRead
-import Plot2D
+import json, subprocess
+import WriteGUI, ParseInput, CSVRead, Plot2D
 
 # Writes main structure into .JSON file
 def saveProject(openetran, name):
@@ -92,43 +87,38 @@ def simulateProject(plotMode, self, openetran):
         # Str lists for the pole sequence for when OpenEtran is called
         poleSeq = list()
 
-        if pole1.isdigit() == True and pole2.isdigit() == True:
-            if int(pole1) <= 0 or int(pole2) <= 0:
-                print('Pole1 and Pole2 must be positive numbers')
-                return
-
+        try:
             firstPole = int(pole1)
-            lastPole = int(pole2)
-
-            if lastPole > firstPole:
-                k = 0
-                for k in range(firstPole, lastPole+1):
-                    poleSeq.append(str(k))
-
-            elif lastPole < firstPole:
-                k = 0
-                for k in range(lastPole, firstPole+1):
-                    poleSeq.append(str(k))
-
-            else:
-                poleSeq.append(pole1)
-
-        else:
-            print('Pole1 and Pole2 must be single numbers')
+        except ValueError:
+            print('Err! "First pole to hit" field must be an int')
             return
 
+        try:
+            lastPole = int(pole2)
+        except ValueError:
+            print('Err! "First pole to hit" field must be an int')
+            return
+
+        if firstPole <= 0 or lastPole <= 0:
+            print('Pole1 and Pole2 must be positive numbers')
+            return
+
+        if firstPole > lastPole:
+            print('First pole must be < than last pole')
+            return
+
+        # Writes the pole sequence for OpenEtran
+        k = 0
+        for k in range(firstPole, lastPole+1):
+            poleSeq.append(str(k))
+
+        # We call OpenEtran with wire1 = wire2 (see OpenEtran doc) in a loop for each selected pole
         for i in poleSeq:
-            # Recommanded to run the critical current mode with wire1 = wire2 (see OpenEtran) doc
             completedProcess = subprocess.run(["openetran.exe", "-icrit", i, i, wire, inputFileName],
-                    stderr=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
+                          stdout=subprocess.PIPE, universal_newlines=True)
 
-            if 'OpenEtran Error' in completedProcess.stderr:
-                print(completedProcess.stderr)
-                return
+            print(completedProcess.stdout)
 
-            elif completedProcess.returncode != 0:
+            if completedProcess.returncode != 0:
                 print('OpenEtran crashed')
                 return
-
-            else:
-                print(completedProcess.stdout)
