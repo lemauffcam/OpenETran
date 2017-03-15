@@ -38,18 +38,8 @@ def strikeDistance(self):
     grid = self.paramBox.layout()
 
     slope = grid.itemAtPosition(2,1).widget().text()
-    current = grid.itemAtPosition(1,1).widget().text()
-
-    # Slope is the sine of the ground angle
-    try:
-        groundAngle = float(slope)
-    except ValueError:
-        groundAngle = 0.0
-
-    try:
-        icrit = float(current)
-    except ValueError:
-        icrit = 0.0
+    rc = list() # striking distance to conductor
+    rg = list() # striking distance to ground (in the end we only return the largest one)
 
     # Read coorductors coordinates (set to 0m if empy field)
     coord = readCoordinates(self)
@@ -57,273 +47,342 @@ def strikeDistance(self):
     # Maximum height of coorductor
     yc = max(coord[1])
 
-    # Rc is the strike distance to coorductor
-    rc = 10.0*math.pow(icrit, 0.65)
-
-    if yc < 43:
-        beta = 0.37 + 0.17 * math.log(43 - yc)
-    else:
-        beta = 0.55
-
-    # Rg is the strike distance to ground
+    # Slope is the sine of the ground angle
     try:
-        rg = beta*rc / math.cos( math.radians(groundAngle) )
-    except ZeroDivisionError:
-        rg = beta*rc
+        groundAngle = float(slope)
+    except ValueError:
+        groundAngle = 0.0
 
-    strikeDist = list()
-    strikeDist.append(rg)
-    strikeDist.append(rc)
+    for k in range(4, 9):
+        current = grid.itemAtPosition(k,3).widget().text()
 
-    return strikeDist
+        try:
+            icrit = float(current)
+        except ValueError:
+            icrit = 0.0
+
+        # Rc is the strike distance to coorductor
+        rc.append(10.0*math.pow(icrit, 0.65))
+
+        if yc < 43:
+            beta = 0.37 + 0.17 * math.log(43 - yc)
+        else:
+            beta = 0.55
+
+        try:
+            rg.append(beta*rc[k-4] / math.cos( math.radians(groundAngle) ))
+        except ZeroDivisionError:
+            rg.append(beta*rc[k-4])
+
+    return rc, max(rg)
 
 # Returns the objects position and height
 def readObj(self):
     grid = self.paramBox.layout()
-    coord = list()
+    obj = list()
     x = list()
     y = list()
 
     # coord[0] will be the x coordinate, coord[1] the y coordinate
-    coord.append(x)
-    coord.append(y)
+    obj.append(x)
+    obj.append(y)
 
     for i in range(10,12):
         for j in range(1,3):
             text = grid.itemAtPosition(i,j).widget().text()
 
             try:
-                coord[j-1].append(float(text))
+                obj[j-1].append(float(text))
 
             except ValueError:
-                coord[j-1].append(0.0)
+                obj[j-1].append(0.0)
 
-    return coord
+    return obj
 
-# Only returns the absciss, the exposure width being a horizontal distance
-def arcIntersection(x1, y1, x2, y2, rc):
-    if y1 != y2:
-        # y_intersection = ax_intersection + b
-        a = (x1 - x2) / (y2 - y1)
-        b = (y2*y2 - y1*y1 + x2*x2 - x1*x1) / (2 * (y2 - y1))
+# Returns the coordinates of the intersections between the 2 arcs, None if no intersection
+def arcIntersection(x1, y1, x2, y2, r1, r2):
+    if y1 != y2 and x1 != x2:
+        a = -(y2 - y1) / (x2 - x1)
+        b = (r1*r1 - r2*r2 - x1*x1 - y1*y1 + x2*x2 + y2*y2) / (2*x2 - 2*x1)
 
-        # x is the solution of a 2nd degree equation
-        A = 1 + a*a
-        B = 2*a*b - 2*x1 - 2*a*y1
-        C = x1*x1 + b*b - 2*b*y1 + y1*y1 - rc*rc
+        A = a*a + 1
+        B = 2*a*b - 2*a*x1 - 2*y1
+        C = b*b - 2*b*x1 + x1*x1 + y1*y1 - r1*r1
+
         det = B*B - 4*A*C
 
-        if det > 0:
-            x_inter1 = (-B + math.sqrt(det))/(2*A)
-            y_inter1 = a*x_inter1 + b
-
-            x_inter2 = (-B - math.sqrt(det))/(2*A)
-            y_inter2 = a*x_inter2 + b
-
+        if det >= 0:
             # Only 1 intersection is relevant, the highest one
             # Also, it needs to be the upper half of the arc
-            if y_inter2 <= y_inter1 and (y_inter2 >= y1 or y_inter2 >= y2):
-               return x_inter1
+            y_inter = (-B + math.sqrt(det))/(2*A)
+            x_inter = a*y_inter + b
 
-            elif y_inter1 >= y_inter2 and (y_inter1 >= y1 or y_inter2 >= y2):
-                return x_inter2
+            if y_inter >= y1 or y_inter >= y2:
+                return (x_inter, y_inter)
 
-    else:
-        x_inter = (x2 + x1) / 2
+    elif y1 == y2 and x1 != x2:
+        x_inter = (r1*r1 - r2*r2 + x2*x2 - x1*x1) / (2*x2 - 2*x1)
+
         A = 1
         B = -2*y1
-        C = math.pow(x_inter - x1, 2) + y1*y1 - rc*rc
+        C = x_inter*x_inter - 2*x_inter*x1 + x1*x1 + y1*y1 - r1*r1
+
         det = B*B - 4*A*C
 
-        if det > 0:
-            y_inter1 = (-B + math.sqrt(det)) / 2
-            y_inter2 = (-B - math.sqrt(det)) / 2
+        if det >= 0:
+            # Only 1 intersection is relevant, the highest one
+            # Also, it needs to be the upper half of the arc
+            y_inter = (-B + math.sqrt(det))/(2*A)
 
-            if y_inter1 >= y1 or y_inter2 >= y1:
-                return x_inter
+            if y_inter >= y1 or y_inter >= y2:
+                return (x_inter, y_inter)
+
+    elif y1 != y2 and x1 == x2:
+        y_inter = (r1*r1 - r2*r2 + x2*x2 - x1*x1) / (2*y2 - 2*y1)
+
+        if y_inter < y1 and y_inter < y2:
+            return
+
+        A = 1
+        B = -2*x1
+        C = y_inter*y_inter - 2*y_inter*y1 + y1*y1 + x1*x1 - r1*r1
+
+        det = B*B - 4*A*C
+
+        if det >= 0:
+            x_inter = (-B + math.sqrt(det))/(2*A)
+            return (x_inter, y_inter)
+
+    else:
+        return
+
+def groundIntersections(x, y, rc, rg, slope, obj):
+    intList = list()
+    tan = math.tan(math.radians(slope))
+
+    # Ground case
+    A = 1
+    B = -2*x
+    C = x*x + math.pow(rg + tan*x - y, 2) - rc*rc
+    det = B*B - 4*A*C
+
+    if det >= 0 and y < rg:
+        x_intG1 = (-B - math.sqrt(det)) / (2*A)
+        x_intG2 = (-B + math.sqrt(det)) / (2*A)
+
+        intList.append(x_intG1)
+        intList.append(rg + tan*x_intG1)
+
+        intList.append(x_intG2)
+        intList.append(rg + tan*x_intG2)
+
+    # 1st object
+    if obj[1][0] > 0 and y < rg + obj[1][0] + tan*x:
+        A = 1
+        B = -2*x
+        C = C = x*x + math.pow(rg + obj[1][0] + tan*x - y, 2) - rc*rc
+        det = B*B - 4*A*C
+
+        if det >= 0:
+            x_intO11 = (-B - math.sqrt(det)) / (2*A)
+            x_intO12 = (-B + math.sqrt(det)) / (2*A)
+
+            # We only care about the intersection on the actual object line
+            if x_intO11 <= obj[0][0] and x_intO12 <= obj[0][0]:
+                intList.append(x_intO11)
+                intList.append(rg + obj[1][0] + tan*x)
+
+                intList.append(x_intO12)
+                intList.append(rg + obj[1][0] + tan*x)
+
+            elif x_intO11 > obj[0][0] and x_intO12 <= obj[0][0]:
+                intList.append(x_intO12)
+                intList.append(rg + obj[1][0] + tan*x)
+
+            elif x_intO11 <= obj[0][0] and x_intO12 > obj[0][0]:
+                intList.append(x_intO11)
+                intList.append(rg + obj[1][0] + tan*x)
+
+    # 2nd object
+    if obj[1][1] > 0 and y < rg + obj[1][1] + tan*x:
+        A = 1
+        B = -2*x
+        C = C = x*x + math.pow(rg + obj[1][1] + tan*x - y, 2) - rc*rc
+        det = B*B - 4*A*C
+
+        if det >= 0:
+            x_intO21 = (-B - math.sqrt(det)) / (2*A)
+            x_intO22 = (-B + math.sqrt(det)) / (2*A)
+
+            # We only care about the intersection on the actual object line
+            if x_intO21 >= obj[0][1] and x_intO22 >= obj[0][1]:
+                intList.append(x_intO21)
+                intList.append(rg + obj[1][1] + tan*x_intO21)
+
+                intList.append(x_intO22)
+                intList.append(rg + obj[1][0] + tan*x_intO22)
+
+            elif x_intO21 < obj[0][1] and x_intO22 >= obj[0][1]:
+                intList.append(x_intO21)
+                intList.append(rg + obj[1][0] + tan*x_intO21)
+
+            elif x_intO21 >= obj[0][1] and x_intO22 < obj[0][1]:
+                intList.append(x_intO22)
+                intList.append(rg + obj[1][0] + tan*x_intO22)
+
+    return intList
+
+def isContained(x, y, coord, obj, rc, rg, k1, k2):
+    arcContained = False
+    for i in range(len(coord[0])):
+        if i != k1 and i != k2:
+            arcContained = math.pow(x - coord[0][i], 2) + math.pow(y - coord[1][i], 2) \
+                            < math.pow(rc[i], 2)
+
+            if arcContained == True:
+                break
+
+    groundContained = y < rg or (obj[1][0] > 0 and y < rg + obj[1][0] and \
+                      abs(x) < abs(obj[0][0])) or \
+                      (obj[1][0] > 0 and y < rg + obj[1][0] and \
+                      abs(x) < abs(obj[0][0]))
+
+    contained = arcContained or groundContained
+    return contained
 
 def flashRate(self):
     grid = self.paramBox.layout()
     coord = readCoordinates(self)
-    strikeDist = strikeDistance(self)
+    rc, rg = strikeDistance(self)
     obj = readObj(self)
 
     # Widget where the flashover rate is displayed
     label = grid.itemAtPosition(15,1).widget()
-
-    icrit_str = grid.itemAtPosition(1,1).widget().text()
     length_str = grid.itemAtPosition(13,1).widget().text()
     flashDens_str = grid.itemAtPosition(14,1).widget().text()
+    angle = grid.itemAtPosition(2,1).widget().text()
+    icrit = list()
 
     try:
-        icrit = float(icrit_str)
+        slope = float(angle)
+
+        if slope > 45:
+            slope = 45.0
+        elif slope < -45:
+            slope = -45.0
+
     except ValueError:
-        icrit = 0.0
+        slope = 0.0
+
+    for k in range(4, 9):
+        current = grid.itemAtPosition(k,3).widget().text()
+
+        try:
+            icrit.append(float(current))
+        except ValueError:
+            label.setText('Err, invalid icrit')
+            return
 
     try:
         length = float(length_str)
     except ValueError:
-        length = 0.0
-
-    try:
-        flashDens = int(flashDens_str)
-    except ValueError:
-        flashDens = 0.0
-
-    expo = list() # list of exposure widths
-    intersecGround = list() # Coordinates of intersections between arcs and ground strike line
-
-    # Shielding wires coordinates
-    x1 = coord[0][3]
-    y1 = coord[1][3]
-    x2 = coord[0][4]
-    y2 = coord[1][4]
-    rc = strikeDist[1] # Striking distance to conductor
-    rg = strikeDist[0] # Striking distance to ground
-
-    shield_intCoord = arcIntersection(x1, y1, x2, y2, rc)
-
-    if shield_intCoord is None:
-        label.setText('Err')
+        label.setText('Err, invalid length')
         return
 
-    # Exposure width of the shielding wire is the horizontal distance between the arcs
-    # intersection and the intersection of each arc with the line representing the striking
-    # distance to ground (or object)
+    try:
+        flashDens = float(flashDens_str)
+    except ValueError:
+        label.setText('Err, invalid flash density')
+        return
 
-    # Intersections with the ground, or an object, strike line
+    expo = list() # list of exposure widths
+
     for k in range(len(coord[0])):
-        x = coord[0][k] # wire coordinates
+        intersec = list() # list of all intersections, with arcs and ground lines
+        uncontainedInt = list()  # list of uncontained intersections, by neither another arc
+                                 # nor the ground
+        x = coord[0][k] # Wire coordinates
         y = coord[1][k]
-        list1 = list()
 
-        # Ground case
-        A = 1
-        B = -2*x
-        C = x*x + math.pow(rg - y, 2) - rc*rc
-        det = B*B - 4*A*C
+        # Intersections with each of the other wires in the system
+        intersec.append(arcIntersection(x, y, coord[0][(k+1)%5], coord[1][(k+1)%5], \
+                                        rc[k], rc[(k+1)%5]))
+        intersec.append(arcIntersection(x, y, coord[0][(k+2)%5], coord[1][(k+2)%5], \
+                                        rc[k], rc[(k+2)%5]))
+        intersec.append(arcIntersection(x, y, coord[0][(k+3)%5], coord[1][(k+3)%5], \
+                                        rc[k], rc[(k+3)%5]))
+        intersec.append(arcIntersection(x, y, coord[0][(k+4)%5], coord[1][(k+4)%5], \
+                                        rc[k], rc[(k+4)%5]))
 
-        if det > 0:
-            x_intG1 = (-B - math.sqrt(det)) / (2*A)
-            x_intG2 = (-B + math.sqrt(det)) / (2*A)
+        # Intersections with the ground and object lines
+        intersec.append(groundIntersections(x, y, rc[k], rg, slope, obj))
 
-            list1.append(x_intG1)
-            list1.append(x_intG2)
+        # Isolate the uncontained arc intersections
+        for i in range(0, 4):
+            if intersec[i] is not None:
+                x_i = intersec[i][0]
+                y_i = intersec[i][1]
 
-        # Object case
-        if obj[1][0] > 0:
-            A = 1
-            B = -2*x
-            C = C = x*x + math.pow(rg + obj[1][0] - y, 2) - rc*rc
-            det = B*B - 4*A*C
+                if isContained(x_i, y_i, coord, obj, rc, rg, k, (k + i + 1)%5) == False:
+                    uncontainedInt.append( (x_i, y_i) )
 
-            if det > 0:
-                x_intO11 = (-B - math.sqrt(det)) / (2*A)
-                x_intO12 = (-B + math.sqrt(det)) / (2*A)
+        # Same with ground intersections
+        if len(intersec[4]) > 0:
+            for i in range(0, len(intersec[4]), 2):
+                x_i = intersec[4][i]
+                y_i = intersec[4][i+1] # Number of elements always even so no problem
 
-                # We only care about the intersection on the actual object line
-                if x_intO11 <= obj[0][0] and x_intO12 <= obj[0][0]:
-                    list1.append(x_intO11)
-                    list1.append(x_intO12)
+                if isContained(x_i, y_i, coord, obj, rc, rg, k, 5) == False:
+                    uncontainedInt.append( (x_i, y_i) )
 
-                elif x_intO11 > obj[0][0] and x_intO12 <= obj[0][0]:
-                    list.append(x_intO12)
+        if len(uncontainedInt) > 1:
+            width = 0
+            # If the arc portion between 2 intersections is uncontained (i.e the point in the
+            # middle is uncontained), we add the horizontal distance to the exposition width
+            for i in range(len(uncontainedInt)):
+                for j in range(len(uncontainedInt)):
+                    if i == j:
+                        continue
 
-                elif x_intO11 <= obj[0][0] and x_intO12 > obj[0][0]:
-                    list.append(x_intO11)
+                    x0 = coord[0][k] # Phase coordinates
+                    y0 = coord[1][k]
+                    x1 = uncontainedInt[i][0] # 1st intersection coordinates
+                    x2 = uncontainedInt[j][0] # 2nd intersection coordinates
 
-        # 2nd object
-        if obj[1][1] > 0:
-            A = 1
-            B = -2*x
-            C = C = x*x + math.pow(rg + obj[1][1] - y, 2) - rc*rc
-            det = B*B - 4*A*C
+                    x = (x1 + x2) / 2
 
-            if det > 0:
-                x_intO21 = (-B - math.sqrt(det)) / (2*A)
-                x_intO22 = (-B + math.sqrt(det)) / (2*A)
+                    A = 1
+                    B = -2*y0
+                    C = y0*y0 + math.pow(x - x0, 2) - rc[k]*rc[k]
+                    det = B*B - 4*A*C
 
-                # We only care about the intersection on the actual object line
-                if x_intO21 >= obj[0][1] and x_intO22 >= obj[0][1]:
-                    list1.append(x_intO21)
-                    list1.append(x_intO22)
+                    y = (-B + math.sqrt(det)) / (2*A)
 
-                elif x_intO21 < obj[0][1] and x_intO22 >= obj[0][1]:
-                    list.append(x_intO21)
+                    if isContained(x, y, coord, obj, rc, rg, k, 5) == False:
+                        # With the current algorithm that distance is calculated twice. Hence the
+                        # /2. Since there are usually no more than 2 or 3 uncontained intersections
+                        # there's no need for a faster method
+                        width += abs(x1 - x2) / 2
 
-                elif x_intO21 >= obj[0][1] and x_intO22 < obj[0][1]:
-                    list.append(x_intO22)
-
-        intersecGround.append(list1)
-
-    # Phase wire exposure width
-    for k in range(0,3):
-        # Check if each phase arc is contained by the shielding arcs
-        x1_In = ( intersecGround[k][0] >= intersecGround[3][0]  \
-                and intersecGround[k][0] <= intersecGround[3][1] ) \
-                or ( intersecGround[k][0] >= intersecGround[4][0]  \
-                and intersecGround[k][0] <= intersecGround[4][1] )
-
-        x2_In = ( intersecGround[k][1] >= intersecGround[3][0]  \
-                and intersecGround[k][1] <= intersecGround[3][1] ) \
-                or ( intersecGround[k][1] >= intersecGround[4][0]  \
-                and intersecGround[k][1] <= intersecGround[4][1] )
-
-        # If the arcs are contained within the shielding wires arcs, then the width is 0
-        if x2_In == True and x1_In == True:
-            expo.append(0)
-
-        # If not it's the horizontal distance between intersection with ground/object line and
-        # and a shielding arc
-        else:
-            x1 = coord[0][k] # Phase wire coordinates
-            y1 = coord[0][k]
-
-            # check if there's an intersection with the 1st shielding wire
-            x2 = coord[0][3] # Shielding wire coordinates
-            y2 = coord[1][3]
-
-            inter1 = arcIntersection(x1, y1, x2, y2, rc)
-
-            # 2nd shielding wire
-            x2 = coord[0][4]
-            y2 = coord[1][4]
-
-            inter2 = arcIntersection(x1, y1, x2, y2, rc)
-
-            # The phase wire is completely exposed
-            if inter1 is None and inter2 is None:
-                expo.append(2*rc)
-
-            # The phase wire intersects with 1 of the shielding wires
-            elif inter1 is None and inter2 is not None:
-                if obj[1][0] > 0:
-                    expo.append(1)
-
-    # Shield wire exposure width: if all phase wires are contained then it's the
-    # horizontal distance between arc intersections and intersection with ground strike line
-    if all(v == 0 for v in expo) == True:
-        if intersecGround[3][0] <= intersecGround[4][0]:
-            expo.append( math.fabs(shield_intCoord - intersecGround[3][0]) )
-            expo.append( math.fabs(shield_intCoord - intersecGround[4][1]) )
+            expo.append(width)
 
         else:
-            expo.append( math.fabs(shield_intCoord - intersecGround[3][1]) )
-            expo.append( math.fabs(shield_intCoord - intersecGround[4][0]) )
+           if coord[1][k] < rg + obj[1][0] or coord[1][k] < rg + obj[1][1]:
+               expo.append(0)
+           else:
+               expo.append(2*rc[k])
 
-
-    # Probability that the 1st stroke current is higher than the critical current
-    pFlash = 1/(1 + math.pow(icrit/31, 2.6))
+    flashRate = 0.0
 
     # Phase wire, we don't use the probability because it's not a backflashover
-    for k in range(len(expo) - 2):
-        expo[k] = expo[k]/1000*length*flashDens
+    for k in range(0,3):
+        flashRate += expo[k]/1000*length*flashDens
 
     # Shielding wire, we use the probability
-    for k in range(len(expo) - 3, len(expo)):
-        expo[k] = expo[k]/1000*length*flashDens*pFlash
-
-    flashRate = math.fsum(expo)
+    for k in range(3,5):
+        # Probability that the 1st stroke current is higher than the critical current
+        pFlash = 1/(1 + math.pow(icrit[k]/31, 2.6))
+        flashRate += expo[k]/1000*length*flashDens*pFlash
 
     label.setText(str(flashRate))
 
@@ -337,7 +396,7 @@ class SysView(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Phase view')
-        self.setGeometry(100, 100, 1200, 500)
+        self.setGeometry(100, 100, 1400, 500)
 
         # Phase view
         mainLayout = QGridLayout()
@@ -348,38 +407,40 @@ class SysView(QWidget):
         paramLayout.addWidget(QPushButton('Update view'), 0, 0)
         paramLayout.addWidget(QPushButton('Flashover Rate'), 0, 1)
 
-        # Critical current and ground slope
-        paramLayout.addWidget(QLabel('I crit [kA]'), 1, 0)
-        paramLayout.addWidget(QLineEdit('6.2'), 1, 1)
-
         paramLayout.addWidget(QLabel('Ground slope [deg]'), 2, 0)
         paramLayout.addWidget(QLineEdit('0'), 2, 1)
 
         paramLayout.addWidget(QLabel('coorductor'), 3, 0)
         paramLayout.addWidget(QLabel('x (m)'), 3, 1)
         paramLayout.addWidget(QLabel('y (m)'), 3, 2)
+        paramLayout.addWidget(QLabel('I crit [kA]'), 3, 3)
 
         # Phase wires
         paramLayout.addWidget(QLabel('A'), 4, 0)
         paramLayout.addWidget(QLineEdit('-3.81'), 4, 1)
         paramLayout.addWidget(QLineEdit('9.63'), 4, 2)
+        paramLayout.addWidget(QLineEdit('15'), 4, 3)
 
         paramLayout.addWidget(QLabel('B'), 5, 0)
         paramLayout.addWidget(QLineEdit('0'), 5, 1)
         paramLayout.addWidget(QLineEdit('9.63'), 5, 2)
+        paramLayout.addWidget(QLineEdit('15'), 5, 3)
 
         paramLayout.addWidget(QLabel('C'), 6, 0)
         paramLayout.addWidget(QLineEdit('3.81'), 6, 1)
         paramLayout.addWidget(QLineEdit('9.63'), 6, 2)
+        paramLayout.addWidget(QLineEdit('15'), 6, 3)
 
         # Shielding wires
         paramLayout.addWidget(QLabel('S1'), 7, 0)
         paramLayout.addWidget(QLineEdit('-2.08'), 7, 1)
         paramLayout.addWidget(QLineEdit('12.73'), 7, 2)
+        paramLayout.addWidget(QLineEdit('15'), 7, 3)
 
         paramLayout.addWidget(QLabel('S2'), 8, 0)
         paramLayout.addWidget(QLineEdit('2.08'), 8, 1)
         paramLayout.addWidget(QLineEdit('12.73'), 8, 2)
+        paramLayout.addWidget(QLineEdit('15'), 8, 3)
 
         # Objects
         paramLayout.addWidget(QLabel('Object'), 9, 0)
@@ -402,7 +463,7 @@ class SysView(QWidget):
         paramLayout.addWidget(QLineEdit('100'), 13, 1)
 
         paramLayout.addWidget(QLabel('Flash density (strike/km2/y)'), 14, 0)
-        paramLayout.addWidget(QLineEdit('50'), 14, 1)
+        paramLayout.addWidget(QLineEdit('10'), 14, 1)
 
         paramLayout.addWidget(QLabel('Flashover rate (per year)'), 15, 0)
         paramLayout.addWidget(QLabel(''), 15, 1)
@@ -457,7 +518,7 @@ class SysView(QWidget):
         coord = readCoordinates(self)
 
         # Calculates striking distances for the arcs
-        strikeDist = strikeDistance(self)
+        rc, rg = strikeDistance(self)
 
         # Reads objects coordinates
         obj = readObj(self)
@@ -483,8 +544,8 @@ class SysView(QWidget):
                     arcOut = True
                     break
 
-                arcWidth = 2*strikeDist[1]*hScale
-                arcHeight = 2*strikeDist[1]*vScale
+                arcWidth = 2*rc[k]*hScale
+                arcHeight = 2*rc[k]*vScale
 
                 condX = self.width() - self.drawView.width()/2 + coord[0][k]*hScale
                 condY = self.drawView.height() - coord[1][k]*vScale
@@ -535,14 +596,24 @@ class SysView(QWidget):
         # Adds arc origin point and height/width (coord[2] is the xOrigin, coord[3] the yOrigin)
         arcOriginX = list()
         arcOriginY = list()
-        arcWidth = 2*strikeDist[1]*hScale
-        arcHeight = 2*strikeDist[1]*vScale
+        arcWidth = list()
+        arcHeight = list()
+
         for k in range(len(coord[0])):
-            arcOriginX.append(int(coord[0][k] - arcWidth/2))
-            arcOriginY.append(int(coord[1][k] - arcHeight/2))
+            width = 2*rc[k]*hScale
+            height = 2*rc[k]*vScale
+
+            arcOriginX.append(int(coord[0][k] - width/2))
+            arcOriginY.append(int(coord[1][k] - height/2))
+            arcWidth.append(width)
+            arcHeight.append(height)
 
         coord.append(arcOriginX)
         coord.append(arcOriginY)
+
+        # Add arc width and height for the "drawArc" function
+        coord.append(arcWidth)
+        coord.append(arcHeight)
 
         # New objects coordinates to screen scales
         for k in range(len(obj[0])):
@@ -553,12 +624,8 @@ class SysView(QWidget):
             obj[0][k] = int(self.width() - self.drawView.width()/2 + obj[0][k]*hScale)
             obj[1][k] = int(self.drawView.height() - obj[1][k]*vScale)
 
-        # Add arc width and height for the "drawArc" function
-        coord.append(arcWidth)
-        coord.append(arcHeight)
-
         # Strike distance to ground
-        coord.append(strikeDist[0]*vScale)
+        coord.append(rg*vScale)
 
         # Objects
         coord.append(obj[0])
@@ -625,7 +692,7 @@ class SysView(QWidget):
                 # Shielding wires in green
                 qp.setPen(QPen(Qt.darkGreen, 2, Qt.SolidLine))
 
-            qp.drawArc(coord[2][k], coord[3][k], coord[4], coord[5], 0, 180*16)
+            qp.drawArc(coord[2][k], coord[3][k], coord[4][k], coord[5][k], 0, 180*16)
 
     def drawObject(self, qp, coord):
         grid = self.paramBox.layout()
