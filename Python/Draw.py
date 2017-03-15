@@ -203,6 +203,20 @@ def groundIntersections(x, y, rc, rg, slope, obj):
                 intList.append(x_intO11)
                 intList.append(rg + obj[1][0] + tan*x)
 
+        # If an object line is above the arc it'll protect it, so we'll treat the point where
+        # the arc goes under the hovering object line as an intersection like the others
+        A = 1
+        B = -2*y
+        C = y*y + math.pow(obj[0][0] - x, 2) - rc*rc
+        det = B*B - 4*A*C
+
+        if det >= 0:
+            y_int = (-B + math.sqrt(det)) / (2*A)
+
+            if rg + obj[1][0] + tan*obj[0][0] >= y_int:
+                intList.append(obj[0][0])
+                intList.append(y_int)
+
     # 2nd object
     if obj[1][1] > 0 and y < rg + obj[1][1] + tan*x:
         A = 1
@@ -220,15 +234,29 @@ def groundIntersections(x, y, rc, rg, slope, obj):
                 intList.append(rg + obj[1][1] + tan*x_intO21)
 
                 intList.append(x_intO22)
-                intList.append(rg + obj[1][0] + tan*x_intO22)
-
-            elif x_intO21 < obj[0][1] and x_intO22 >= obj[0][1]:
-                intList.append(x_intO21)
-                intList.append(rg + obj[1][0] + tan*x_intO21)
+                intList.append(rg + obj[1][1] + tan*x_intO22)
 
             elif x_intO21 >= obj[0][1] and x_intO22 < obj[0][1]:
+                intList.append(x_intO21)
+                intList.append(rg + obj[1][1] + tan*x_intO21)
+
+            elif x_intO21 < obj[0][1] and x_intO22 >= obj[0][1]:
                 intList.append(x_intO22)
-                intList.append(rg + obj[1][0] + tan*x_intO22)
+                intList.append(rg + obj[1][1] + tan*x_intO22)
+
+        # If an object line is above the arc it'll protect it, so we'll treat the point where
+        # the arc goes under the hovering object line as an intersection like the others
+        A = 1
+        B = -2*y
+        C = y*y + math.pow(obj[0][1] - x, 2) - rc*rc
+        det = B*B - 4*A*C
+
+        if det >= 0:
+            y_int = (-B + math.sqrt(det)) / (2*A)
+
+            if rg + obj[1][1] + tan*obj[0][1] > y_int:
+                intList.append(obj[0][1])
+                intList.append(y_int)
 
     return intList
 
@@ -243,9 +271,9 @@ def isContained(x, y, coord, obj, rc, rg, k1, k2):
                 break
 
     groundContained = y < rg or (obj[1][0] > 0 and y < rg + obj[1][0] and \
-                      abs(x) < abs(obj[0][0])) or \
-                      (obj[1][0] > 0 and y < rg + obj[1][0] and \
-                      abs(x) < abs(obj[0][0]))
+                      x < obj[0][0]) or \
+                      (obj[1][1] > 0 and y < rg + obj[1][1] and \
+                      x > obj[1][0])
 
     contained = arcContained or groundContained
     return contained
