@@ -34,12 +34,9 @@ def readCoordinates(self):
     return coord
 
 # Returns the lightning striking distances
-def strikeDistance(self):
+def strikeDistance(self, current):
     grid = self.paramBox.layout()
-
     slope = grid.itemAtPosition(2,1).widget().text()
-    rc = list() # striking distance to conductor
-    rg = list() # striking distance to ground (in the end we only return the largest one)
 
     # Read coorductors coordinates (set to 0m if empy field)
     coord = readCoordinates(self)
@@ -53,28 +50,20 @@ def strikeDistance(self):
     except ValueError:
         groundAngle = 0.0
 
-    for k in range(4, 9):
-        current = grid.itemAtPosition(k,3).widget().text()
+    # Rc is the strike distance to coorductor
+    rc = 10.0*math.pow(current, 0.65)
 
-        try:
-            icrit = float(current)
-        except ValueError:
-            icrit = 0.0
+    if yc < 43:
+        beta = 0.37 + 0.17 * math.log(43 - yc)
+    else:
+        beta = 0.55
 
-        # Rc is the strike distance to coorductor
-        rc.append(10.0*math.pow(icrit, 0.65))
+    try:
+        rg = beta*rc / math.cos( math.radians(groundAngle) )
+    except ZeroDivisionError:
+        rg = beta*rc
 
-        if yc < 43:
-            beta = 0.37 + 0.17 * math.log(43 - yc)
-        else:
-            beta = 0.55
-
-        try:
-            rg.append(beta*rc[k-4] / math.cos( math.radians(groundAngle) ))
-        except ZeroDivisionError:
-            rg.append(beta*rc[k-4])
-
-    return rc, max(rg)
+    return rc, rg
 
 # Returns the objects position and height
 def readObj(self):
@@ -100,14 +89,14 @@ def readObj(self):
     return obj
 
 # Returns the coordinates of the intersections between the 2 arcs, None if no intersection
-def arcIntersection(x1, y1, x2, y2, r1, r2):
+def arcIntersection(x1, y1, x2, y2, rc):
     if y1 != y2 and x1 != x2:
         a = -(y2 - y1) / (x2 - x1)
-        b = (r1*r1 - r2*r2 - x1*x1 - y1*y1 + x2*x2 + y2*y2) / (2*x2 - 2*x1)
+        b = (-x1*x1 - y1*y1 + x2*x2 + y2*y2) / (2*x2 - 2*x1)
 
         A = a*a + 1
         B = 2*a*b - 2*a*x1 - 2*y1
-        C = b*b - 2*b*x1 + x1*x1 + y1*y1 - r1*r1
+        C = b*b - 2*b*x1 + x1*x1 + y1*y1 - rc*rc
 
         det = B*B - 4*A*C
 
@@ -121,11 +110,11 @@ def arcIntersection(x1, y1, x2, y2, r1, r2):
                 return (x_inter, y_inter)
 
     elif y1 == y2 and x1 != x2:
-        x_inter = (r1*r1 - r2*r2 + x2*x2 - x1*x1) / (2*x2 - 2*x1)
+        x_inter = (x2*x2 - x1*x1) / (2*x2 - 2*x1)
 
         A = 1
         B = -2*y1
-        C = x_inter*x_inter - 2*x_inter*x1 + x1*x1 + y1*y1 - r1*r1
+        C = x_inter*x_inter - 2*x_inter*x1 + x1*x1 + y1*y1 - rc*rc
 
         det = B*B - 4*A*C
 
@@ -138,14 +127,14 @@ def arcIntersection(x1, y1, x2, y2, r1, r2):
                 return (x_inter, y_inter)
 
     elif y1 != y2 and x1 == x2:
-        y_inter = (r1*r1 - r2*r2 + x2*x2 - x1*x1) / (2*y2 - 2*y1)
+        y_inter = (x2*x2 - x1*x1) / (2*y2 - 2*y1)
 
         if y_inter < y1 and y_inter < y2:
             return
 
         A = 1
         B = -2*x1
-        C = y_inter*y_inter - 2*y_inter*y1 + y1*y1 + x1*x1 - r1*r1
+        C = y_inter*y_inter - 2*y_inter*y1 + y1*y1 + x1*x1 - rc*rc
 
         det = B*B - 4*A*C
 
@@ -265,7 +254,7 @@ def isContained(x, y, coord, obj, rc, rg, k1, k2):
     for i in range(len(coord[0])):
         if i != k1 and i != k2:
             arcContained = math.pow(x - coord[0][i], 2) + math.pow(y - coord[1][i], 2) \
-                            < math.pow(rc[i], 2)
+                            < math.pow(rc, 2)
 
             if arcContained == True:
                 break
@@ -281,7 +270,6 @@ def isContained(x, y, coord, obj, rc, rg, k1, k2):
 def flashRate(self):
     grid = self.paramBox.layout()
     coord = readCoordinates(self)
-    rc, rg = strikeDistance(self)
     obj = readObj(self)
 
     # Widget where the flashover rate is displayed
@@ -323,94 +311,95 @@ def flashRate(self):
         label.setText('Err, invalid flash density')
         return
 
-    expo = list() # list of exposure widths
+    flashRate = 0.0 # Flashover rate
 
-    for k in range(len(coord[0])):
-        intersec = list() # list of all intersections, with arcs and ground lines
-        uncontainedInt = list()  # list of uncontained intersections, by neither another arc
-                                 # nor the ground
-        x = coord[0][k] # Wire coordinates
-        y = coord[1][k]
+    for current in [x * 0.5 for x in range(5, 601)]:
+        rc, rg = strikeDistance(self, current)
+        expo = list() # list of exposure widths
 
-        # Intersections with each of the other wires in the system
-        intersec.append(arcIntersection(x, y, coord[0][(k+1)%5], coord[1][(k+1)%5], \
-                                        rc[k], rc[(k+1)%5]))
-        intersec.append(arcIntersection(x, y, coord[0][(k+2)%5], coord[1][(k+2)%5], \
-                                        rc[k], rc[(k+2)%5]))
-        intersec.append(arcIntersection(x, y, coord[0][(k+3)%5], coord[1][(k+3)%5], \
-                                        rc[k], rc[(k+3)%5]))
-        intersec.append(arcIntersection(x, y, coord[0][(k+4)%5], coord[1][(k+4)%5], \
-                                        rc[k], rc[(k+4)%5]))
+        for k in range(len(coord[0])):
+			# If the current is less than the wire's critical current, the stroke won't cause a flashover
+            if current < icrit[k]:
+                expo.append(0)
+                continue
 
-        # Intersections with the ground and object lines
-        intersec.append(groundIntersections(x, y, rc[k], rg, slope, obj))
+            intersec = list() # list of all intersections, with arcs and ground lines
+            uncontainedInt = list()  # list of uncontained intersections, by neither another arc
+                                     # nor the ground
+            x = coord[0][k] # Wire coordinates
+            y = coord[1][k]
 
-        # Isolate the uncontained arc intersections
-        for i in range(0, 4):
-            if intersec[i] is not None:
-                x_i = intersec[i][0]
-                y_i = intersec[i][1]
+            # Intersections with each of the other wires in the system
+            intersec.append(arcIntersection(x, y, coord[0][(k+1)%5], coord[1][(k+1)%5], rc))
+            intersec.append(arcIntersection(x, y, coord[0][(k+2)%5], coord[1][(k+2)%5], rc))
+            intersec.append(arcIntersection(x, y, coord[0][(k+3)%5], coord[1][(k+3)%5], rc))
+            intersec.append(arcIntersection(x, y, coord[0][(k+4)%5], coord[1][(k+4)%5], rc))
 
-                if isContained(x_i, y_i, coord, obj, rc, rg, k, (k + i + 1)%5) == False:
-                    uncontainedInt.append( (x_i, y_i) )
+            # Intersections with the ground and object lines
+            intersec.append(groundIntersections(x, y, rc, rg, slope, obj))
 
-        # Same with ground intersections
-        if len(intersec[4]) > 0:
-            for i in range(0, len(intersec[4]), 2):
-                x_i = intersec[4][i]
-                y_i = intersec[4][i+1] # Number of elements always even so no problem
+            # Isolate the uncontained arc intersections
+            for i in range(0, 4):
+                if intersec[i] is not None:
+                    x_i = intersec[i][0]
+                    y_i = intersec[i][1]
 
-                if isContained(x_i, y_i, coord, obj, rc, rg, k, 5) == False:
-                    uncontainedInt.append( (x_i, y_i) )
+                    if isContained(x_i, y_i, coord, obj, rc, rg, k, (k + i + 1)%5) == False:
+                        uncontainedInt.append( (x_i, y_i) )
 
-        if len(uncontainedInt) > 1:
-            width = 0
-            # If the arc portion between 2 intersections is uncontained (i.e the point in the
-            # middle is uncontained), we add the horizontal distance to the exposition width
-            for i in range(len(uncontainedInt)):
-                for j in range(len(uncontainedInt)):
-                    if i == j:
-                        continue
+            # Same with ground intersections
+            if len(intersec[4]) > 0:
+                for i in range(0, len(intersec[4]), 2):
+                    x_i = intersec[4][i]
+                    y_i = intersec[4][i+1] # Number of elements always even so no problem
 
-                    x0 = coord[0][k] # Phase coordinates
-                    y0 = coord[1][k]
-                    x1 = uncontainedInt[i][0] # 1st intersection coordinates
-                    x2 = uncontainedInt[j][0] # 2nd intersection coordinates
+                    if isContained(x_i, y_i, coord, obj, rc, rg, k, 5) == False:
+                        uncontainedInt.append( (x_i, y_i) )
 
-                    x = (x1 + x2) / 2
+            if len(uncontainedInt) > 1:
+                width = 0
+                # If the arc portion between 2 intersections is uncontained (i.e the point in the
+                # middle is uncontained), we add the horizontal distance to the exposition width
+                for i in range(len(uncontainedInt)):
+                    for j in range(len(uncontainedInt)):
+                        if i == j:
+                            continue
 
-                    A = 1
-                    B = -2*y0
-                    C = y0*y0 + math.pow(x - x0, 2) - rc[k]*rc[k]
-                    det = B*B - 4*A*C
+                        x0 = coord[0][k] # Phase coordinates
+                        y0 = coord[1][k]
+                        x1 = uncontainedInt[i][0] # 1st intersection coordinates
+                        x2 = uncontainedInt[j][0] # 2nd intersection coordinates
 
-                    y = (-B + math.sqrt(det)) / (2*A)
+                        x = (x1 + x2) / 2
 
-                    if isContained(x, y, coord, obj, rc, rg, k, 5) == False:
-                        # With the current algorithm that distance is calculated twice. Hence the
-                        # /2. Since there are usually no more than 2 or 3 uncontained intersections
-                        # there's no need for a faster method
-                        width += abs(x1 - x2) / 2
+                        A = 1
+                        B = -2*y0
+                        C = y0*y0 + math.pow(x - x0, 2) - rc*rc
+                        det = B*B - 4*A*C
 
-            expo.append(width)
+                        y = (-B + math.sqrt(det)) / (2*A)
 
-        else:
-           if coord[1][k] < rg + obj[1][0] or coord[1][k] < rg + obj[1][1]:
-               expo.append(0)
-           else:
-               expo.append(2*rc[k])
+                        if isContained(x, y, coord, obj, rc, rg, k, 5) == False:
+                            # With the current algorithm that distance is calculated twice. Hence the
+                            # /2. Since there are usually no more than 2 or 3 uncontained intersections
+                            # there's no need for a faster method
+                            width += abs(x1 - x2) / 2
 
-    flashRate = 0.0
+                expo.append(width)
 
-    # Phase wire, we don't use the probability because it's not a backflashover
-    for k in range(0,3):
-        flashRate += expo[k]/1000*length*flashDens
+            else:
+               if coord[1][k] < rg + obj[1][0] or coord[1][k] < rg + obj[1][1]:
+                   expo.append(0)
+               else:
+                   expo.append(2*rc)
 
-    # Shielding wire, we use the probability
-    for k in range(3,5):
-        # Probability that the 1st stroke current is higher than the critical current
-        pFlash = 1/(1 + math.pow(icrit[k]/31, 2.6))
-        flashRate += expo[k]/1000*length*flashDens*pFlash
+        # Calculate the flashover rate using the exposure width
+        for k in range(len(expo)):
+            # Probability that the 1st stroke current is higher than the critical current
+            pFlash = 1/(1 + math.pow(current/31, 2.6))
+            flashRate += expo[k]/1000*length*flashDens*pFlash
+
+        del[expo]
 
     label.setText(str(flashRate))
 
@@ -434,6 +423,9 @@ class SysView(QWidget):
 
         paramLayout.addWidget(QPushButton('Update view'), 0, 0)
         paramLayout.addWidget(QPushButton('Flashover Rate'), 0, 1)
+
+        paramLayout.addWidget(QLabel('Current [kA]'), 1, 0)
+        paramLayout.addWidget(QLineEdit('15'), 1, 1)
 
         paramLayout.addWidget(QLabel('Ground slope [deg]'), 2, 0)
         paramLayout.addWidget(QLineEdit('0'), 2, 1)
@@ -545,8 +537,16 @@ class SysView(QWidget):
         # Read coorductors coordinates (set to 0m if empy field)
         coord = readCoordinates(self)
 
+        grid = self.paramBox.layout()
+        current_str = grid.itemAtPosition(1,1).widget().text()
+
+        try:
+            current = math.fabs(float(current_str))
+        except ValueError:
+            current = 0.0
+
         # Calculates striking distances for the arcs
-        rc, rg = strikeDistance(self)
+        rc, rg = strikeDistance(self, current)
 
         # Reads objects coordinates
         obj = readObj(self)
@@ -572,8 +572,8 @@ class SysView(QWidget):
                     arcOut = True
                     break
 
-                arcWidth = 2*rc[k]*hScale
-                arcHeight = 2*rc[k]*vScale
+                arcWidth = 2*rc*hScale
+                arcHeight = 2*rc*vScale
 
                 condX = self.width() - self.drawView.width()/2 + coord[0][k]*hScale
                 condY = self.drawView.height() - coord[1][k]*vScale
@@ -628,8 +628,8 @@ class SysView(QWidget):
         arcHeight = list()
 
         for k in range(len(coord[0])):
-            width = 2*rc[k]*hScale
-            height = 2*rc[k]*vScale
+            width = 2*rc*hScale
+            height = 2*rc*vScale
 
             arcOriginX.append(int(coord[0][k] - width/2))
             arcOriginY.append(int(coord[1][k] - height/2))
