@@ -312,6 +312,7 @@ def flashRate(self):
         return
 
     flashRate = 0.0 # Flashover rate
+    pLast = 1.0 # probability that the current is higher than zero kA
 
     for current in [x * 0.5 for x in range(5, 601)]:
         rc, rg = strikeDistance(self, current)
@@ -393,11 +394,15 @@ def flashRate(self):
                else:
                    expo.append(2*rc)
 
+        # Probability that the 1st stroke current is higher than this current
+        pFlash = 1/(1 + math.pow(current/31, 2.6))
+        pBin = pLast - pFlash # probability that the current is inside this histogram bin
+#        print(current,pLast,pFlash,pBin,rc,rg,expo)
+        pLast = pFlash
+
         # Calculate the flashover rate using the exposure width
         for k in range(len(expo)):
-            # Probability that the 1st stroke current is higher than the critical current
-            pFlash = 1/(1 + math.pow(current/31, 2.6))
-            flashRate += expo[k]/1000*length*flashDens*pFlash
+            flashRate += expo[k]/1000*length*flashDens*pBin
 
         del[expo]
 
