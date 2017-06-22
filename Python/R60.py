@@ -41,6 +41,8 @@ def calcR60(openetran, grid):
           math.sqrt(1 + math.pow(a/li, 2)) + math.log((li + math.sqrt(li*li + 4*h*h)) / (2*h)) -
           math.sqrt(1 + math.pow(2 * h / li, 2)) );
 
+        ri /= nSeg
+
         # Capacitance and conductance (only conductance is used, but Ci is needed to calculate it)
         if 2*h-a > a:
             Ci = shuntCapa(li, eps, a) + shuntCapa(li, eps, 2*h - a)
@@ -67,6 +69,12 @@ def calcR60(openetran, grid):
         Z = Gi*sumB/sumC
         label.setText(str(Z))
 
+        print(rho,a,h,ltot,nSeg,eps,li,ri,Ci,Gi,K,sumB,sumC)
+        Rseries = ri + 1/Gi
+        for j in range(nSeg):
+            Rparallel = Rseries/Gi/(Rseries + 1/Gi)
+            Rseries = Rparallel + ri
+            print(j,Rparallel,Rseries)
 
         rowCount = rowCount-6
         k -= 1
