@@ -1,0 +1,43 @@
+5 11 122 1 1 0.02e-6 25e-6 
+conductor 1 11.4 -7.2 0.0140  0 
+conductor 2 11.4    0 0.0140  0 
+conductor 3 11.4  7.2 0.0140  0 
+conductor 4 16   -3.8 0.0065 0 
+conductor 5 16    3.8 0.0065 0 
+
+surge 50e3 1e-6 50e-6 0 
+pairs 4 0
+poles 6
+
+ground 200 100 300e3 0.5e-6 18 0.01 1 122 10 9 
+pairs 4 0
+poles all
+
+labelphase 1 A
+labelphase 2 B
+labelphase 3 C
+
+resistor 0.001 
+pairs 4 5
+poles all
+
+meter 0 
+pairs 1 4
+poles 5 6
+
+meter 0 
+pairs 2 4
+poles 5 6
+
+meter 0 
+pairs 3 4
+poles 5 6
+
+meter 0 
+pairs 4 0
+poles 5 6
+
+meter 2 
+pairs 4 0
+poles 5 6
+
