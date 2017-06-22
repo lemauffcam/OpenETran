@@ -54,10 +54,10 @@ def writeKey(f, openetran, key):
         f.write('\n')
 
 def write(openetran):
-    if openetran['name'] == '':
-        openetran['name'] = 'myProject'
+    k = len(openetran['name'])
+    inputFileName = openetran['name'][0:k-5] + '.dat'
 
-    with open(openetran['name'] + '.dat', 'w') as f:
+    with open(inputFileName, 'w') as f:
 
         # We write the mandatory simulation parameters and conductor data first
         for v in openetran['simulation']:

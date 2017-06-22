@@ -8,11 +8,15 @@ Calculates the 60Hz resistance of the counterpoise
 import math
 
 def calcR60(openetran, grid):
-    rowCount = grid.rowCount() - 1
+    rowCount = grid.rowCount() - 4
     k = len(openetran['ground']) - 1
 
-    while rowCount > 2:
-        label = grid.itemAtPosition(rowCount, 1).widget()
+    while rowCount >= 2:
+        try:
+            label = grid.itemAtPosition(rowCount, 1).widget()
+        except AttributeError:
+            rowCount = rowCount-5
+            continue
 
         # Read counterpoise parameters (first as strings)
         rho_str = openetran['ground'][k][1]
@@ -22,12 +26,18 @@ def calcR60(openetran, grid):
         nSeg_str = openetran['ground'][k][8]
         eps_str = openetran['ground'][k][9]
 
-        rho = float(rho_str)
-        a = float(a_str)
-        h = float(h_str)
-        ltot = float(ltot_str)
-        nSeg = int(nSeg_str)
-        eps = float(eps_str)
+        try:
+            rho = float(rho_str)
+            a = float(a_str)
+            h = float(h_str)
+            ltot = float(ltot_str)
+            nSeg = int(nSeg_str)
+            eps = float(eps_str)
+
+        except ValueError:
+            rowCount = rowCount-5
+            k -= 1
+            continue
 
         # Length of 1 segment
         if nSeg > 0 and a > 0 and h > 0 and ltot > 0:
@@ -76,7 +86,7 @@ def calcR60(openetran, grid):
             Rseries = Rparallel + ri
             print(j,Rparallel,Rseries)
 
-        rowCount = rowCount-6
+        rowCount = rowCount-5
         k -= 1
 
     return

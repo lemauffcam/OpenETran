@@ -6,7 +6,7 @@ Draws the system
 
 @author: Matthieu
 """
-from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QLineEdit
+from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QLineEdit, QFileDialog
 from PyQt5.QtGui import QPen, QPainter, QPolygonF, QPainterPath, QColor
 from PyQt5.QtCore import pyqtSlot, Qt, QLineF, QPointF
 import math
@@ -277,7 +277,58 @@ def flashRate(self):
     length_str = grid.itemAtPosition(13,1).widget().text()
     flashDens_str = grid.itemAtPosition(14,1).widget().text()
     angle = grid.itemAtPosition(2,1).widget().text()
-    icrit = list()
+    icritList = list()
+
+    # First we read all the critical currents
+    # Get filename
+    fileDialog = QFileDialog()
+    name = fileDialog.getOpenFileName(None, 'Critical currents file', '/home', 'Text Files (*.txt)')
+
+    if name == ('',''):
+        return
+
+    # 1 list for each wire currents
+    for i in range(5):
+        icritList.append(list())
+
+    fileName = name[0]
+    with open(fileName, 'r') as f:
+        # Reads the whole critical currents file
+        output = f.readlines()
+
+        # If the word 'wire' is in a line, there's a critical current value to store
+        for line in output:
+            if 'wire' in line:
+                end = len(line)
+                pos = int(line[7]) - 1 # Wire number in the string, needed to know which
+                                       # position it should take on the list.
+                try:
+                    current = float(line[end-14:end-1]) / 1000 # Actual critical current value [kA]
+                except ValueError:
+                    print('Critical current reading error')
+                    continue
+
+                icritList[pos].append(current)
+            else:
+                continue
+
+    # Check length of list for considered phases (how many poles)
+    length = 0
+    for k in range(5):
+        if len(icritList[k]) > length:
+            length = len(icritList[k])
+            break
+
+    if length == 0:
+        print('Err, critical currents file empty')
+        return
+
+    # If there's an empty line in the list, then the wire was not considered
+    # We fill the line with -1 to indicate this phase isn't considered for the following analysis
+    for k in range(5):
+        if len(icritList[k]) == 0:
+            for i in range(length):
+                icritList[k].append(-1.0)
 
     try:
         slope = float(angle)
@@ -289,15 +340,6 @@ def flashRate(self):
 
     except ValueError:
         slope = 0.0
-
-    for k in range(4, 9):
-        current = grid.itemAtPosition(k,3).widget().text()
-
-        try:
-            icrit.append(float(current))
-        except ValueError:
-            label.setText('Err, invalid icrit')
-            return
 
     try:
         length = float(length_str)
@@ -311,114 +353,130 @@ def flashRate(self):
         label.setText('Err, invalid flash density')
         return
 
-    flashRate = 0.0 # Flashover rate
-    pLast = 1.0 # probability that the current is higher than zero kA
+    flashRate_Total = list() # List of flashover rates at each pole
 
-    for current in [x * 0.5 for x in range(5, 601)]:
-        rc, rg = strikeDistance(self, current)
-        expo = list() # list of exposure widths
+    for i in range(len(icritList[0])):
+        icrit = list()
+        for j in range(5):
+            icrit.append(icritList[j][i])
 
-        for k in range(len(coord[0])):
-			# If the current is less than the wire's critical current, the stroke won't cause a flashover
-            if current < icrit[k]:
-                expo.append(0)
-                continue
+        pLast = 1.0 # probability that the current is higher than zero kA
+        flashRate_Pole = 0.0 # Flashover rate at the current pole
 
-            intersec = list() # list of all intersections, with arcs and ground lines
-            uncontainedInt = list()  # list of uncontained intersections, by neither another arc
-                                     # nor the ground
-            x = coord[0][k] # Wire coordinates
-            y = coord[1][k]
+        for current in [x * 0.5 for x in range(5, 601)]:
+            rc, rg = strikeDistance(self, current)
+            expo = list() # list of exposure widths
 
-            # Intersections with each of the other wires in the system
-            intersec.append(arcIntersection(x, y, coord[0][(k+1)%5], coord[1][(k+1)%5], rc))
-            intersec.append(arcIntersection(x, y, coord[0][(k+2)%5], coord[1][(k+2)%5], rc))
-            intersec.append(arcIntersection(x, y, coord[0][(k+3)%5], coord[1][(k+3)%5], rc))
-            intersec.append(arcIntersection(x, y, coord[0][(k+4)%5], coord[1][(k+4)%5], rc))
+            for k in range(len(coord[0])):
+            	   # If the current is less than the wire's critical current, the stroke won't cause a flashover
+                # If the current is -1, the wire is not considered for the analysis
+                if current < icrit[k] or icrit[k] == -1:
+                    expo.append(0)
+                    continue
 
-            # Intersections with the ground and object lines
-            intersec.append(groundIntersections(x, y, rc, rg, slope, obj))
+                intersec = list() # list of all intersections, with arcs and ground lines
+                uncontainedInt = list()  # list of uncontained intersections, by neither another arc
+                                         # nor the ground
+                x = coord[0][k] # Wire coordinates
+                y = coord[1][k]
 
-            # Isolate the uncontained arc intersections
-            for i in range(0, 4):
-                if intersec[i] is not None:
-                    x_i = intersec[i][0]
-                    y_i = intersec[i][1]
+                # Intersections with each of the other wires in the system
+                intersec.append(arcIntersection(x, y, coord[0][(k+1)%5], coord[1][(k+1)%5], rc))
+                intersec.append(arcIntersection(x, y, coord[0][(k+2)%5], coord[1][(k+2)%5], rc))
+                intersec.append(arcIntersection(x, y, coord[0][(k+3)%5], coord[1][(k+3)%5], rc))
+                intersec.append(arcIntersection(x, y, coord[0][(k+4)%5], coord[1][(k+4)%5], rc))
 
-                    if isContained(x_i, y_i, coord, obj, rc, rg, k, (k + i + 1)%5) == False:
-                        uncontainedInt.append( (x_i, y_i) )
+                # Intersections with the ground and object lines
+                intersec.append(groundIntersections(x, y, rc, rg, slope, obj))
 
-            # Same with ground intersections
-            if len(intersec[4]) > 0:
-                for i in range(0, len(intersec[4]), 2):
-                    x_i = intersec[4][i]
-                    y_i = intersec[4][i+1] # Number of elements always even so no problem
+                # Isolate the uncontained arc intersections
+                for i in range(0, 4):
+                    if intersec[i] is not None:
+                        x_i = intersec[i][0]
+                        y_i = intersec[i][1]
 
-                    if isContained(x_i, y_i, coord, obj, rc, rg, k, 5) == False:
-                        uncontainedInt.append( (x_i, y_i) )
+                        if isContained(x_i, y_i, coord, obj, rc, rg, k, (k + i + 1)%5) == False:
+                            uncontainedInt.append( (x_i, y_i) )
 
-            if len(uncontainedInt) > 1:
-                width = 0
-                # If the arc portion between 2 intersections is uncontained (i.e the point in the
-                # middle is uncontained), we add the horizontal distance to the exposition width
-                for i in range(len(uncontainedInt)):
-                    for j in range(len(uncontainedInt)):
-                        if i == j:
-                            continue
+                # Same with ground intersections
+                if len(intersec[4]) > 0:
+                    for i in range(0, len(intersec[4]), 2):
+                        x_i = intersec[4][i]
+                        y_i = intersec[4][i+1] # Number of elements always even so no problem
 
-                        x0 = coord[0][k] # Phase coordinates
-                        y0 = coord[1][k]
-                        x1 = uncontainedInt[i][0] # 1st intersection coordinates
-                        x2 = uncontainedInt[j][0] # 2nd intersection coordinates
+                        if isContained(x_i, y_i, coord, obj, rc, rg, k, 5) == False:
+                            uncontainedInt.append( (x_i, y_i) )
 
-                        x = (x1 + x2) / 2
+                if len(uncontainedInt) > 1:
+                    width = 0
+                    # If the arc portion between 2 intersections is uncontained (i.e the point in the
+                    # middle is uncontained), we add the horizontal distance to the exposition width
+                    for i in range(len(uncontainedInt)):
+                        for j in range(len(uncontainedInt)):
+                            if i == j:
+                                continue
 
-                        A = 1
-                        B = -2*y0
-                        C = y0*y0 + math.pow(x - x0, 2) - rc*rc
-                        det = B*B - 4*A*C
+                            x0 = coord[0][k] # Phase coordinates
+                            y0 = coord[1][k]
+                            x1 = uncontainedInt[i][0] # 1st intersection coordinates
+                            x2 = uncontainedInt[j][0] # 2nd intersection coordinates
 
-                        y = (-B + math.sqrt(det)) / (2*A)
+                            x = (x1 + x2) / 2
 
-                        if isContained(x, y, coord, obj, rc, rg, k, 5) == False:
-                            # With the current algorithm that distance is calculated twice. Hence the
-                            # /2. Since there are usually no more than 2 or 3 uncontained intersections
-                            # there's no need for a faster method
-                            width += abs(x1 - x2) / 2
+                            A = 1
+                            B = -2*y0
+                            C = y0*y0 + math.pow(x - x0, 2) - rc*rc
+                            det = B*B - 4*A*C
 
-                expo.append(width)
+                            y = (-B + math.sqrt(det)) / (2*A)
 
-            else:
-               if coord[1][k] < rg + obj[1][0] or coord[1][k] < rg + obj[1][1]:
-                   expo.append(0)
-               else:
-                   expo.append(2*rc)
+                            if isContained(x, y, coord, obj, rc, rg, k, 5) == False:
+                                # With the current algorithm that distance is calculated twice. Hence the
+                                # /2. Since there are usually no more than 2 or 3 uncontained intersections
+                                # there's no need for a faster method
+                                width += abs(x1 - x2) / 2
 
-        # Probability that the 1st stroke current is higher than this current
-        pFlash = 1/(1 + math.pow(current/31, 2.6))
-        pBin = pLast - pFlash # probability that the current is inside this histogram bin
-#        print(current,pLast,pFlash,pBin,rc,rg,expo)
-        pLast = pFlash
+                    expo.append(width)
 
-        # Calculate the flashover rate using the exposure width
-        for k in range(len(expo)):
-            flashRate += expo[k]/1000*length*flashDens*pBin
+                else:
+                   if coord[1][k] < rg + obj[1][0] or coord[1][k] < rg + obj[1][1]:
+                       expo.append(0)
+                   else:
+                       expo.append(2*rc)
 
-        del[expo]
+            # Probability that the 1st stroke current is higher than this current
+            pFlash = 1/(1 + math.pow(current/31, 2.6))
+            pBin = pLast - pFlash # probability that the current is inside this histogram bin
 
-    label.setText(str(flashRate))
+            pLast = pFlash
+
+            # Calculate the flashover rate using the exposure width
+            for k in range(len(expo)):
+                flashRate_Pole += expo[k]/1000*length*flashDens*pBin
+
+            del[expo]
+
+        flashRate_Total.append(flashRate_Pole)
+
+    # We display the average flashover rate for the whole line
+    flashRate_Average = sum(flashRate_Total) / max(len(flashRate_Total),1)
+    label.setText(str(flashRate_Average))
+    print('Flashover rate calculation complete')
 
     return
 
 class SysView(QWidget):
-    def __init__(self):
+    def __init__(self, openetran_window):
         super().__init__()
+
+        self.openEtran = openetran_window
+
         self.initUI()
 
 
     def initUI(self):
         self.setWindowTitle('Phase view')
-        self.setGeometry(100, 100, 1400, 500)
+        self.setGeometry(100, 100, 1200, 500)
 
         # Phase view
         mainLayout = QGridLayout()
@@ -428,6 +486,7 @@ class SysView(QWidget):
 
         paramLayout.addWidget(QPushButton('Update view'), 0, 0)
         paramLayout.addWidget(QPushButton('Flashover Rate'), 0, 1)
+        paramLayout.addWidget(QPushButton('Update coordinates'), 0, 2)
 
         paramLayout.addWidget(QLabel('Current [kA]'), 1, 0)
         paramLayout.addWidget(QLineEdit('15'), 1, 1)
@@ -438,34 +497,28 @@ class SysView(QWidget):
         paramLayout.addWidget(QLabel('coorductor'), 3, 0)
         paramLayout.addWidget(QLabel('x (m)'), 3, 1)
         paramLayout.addWidget(QLabel('y (m)'), 3, 2)
-        paramLayout.addWidget(QLabel('I crit [kA]'), 3, 3)
 
         # Phase wires
         paramLayout.addWidget(QLabel('A'), 4, 0)
         paramLayout.addWidget(QLineEdit('-3.81'), 4, 1)
         paramLayout.addWidget(QLineEdit('9.63'), 4, 2)
-        paramLayout.addWidget(QLineEdit('15'), 4, 3)
 
         paramLayout.addWidget(QLabel('B'), 5, 0)
         paramLayout.addWidget(QLineEdit('0'), 5, 1)
         paramLayout.addWidget(QLineEdit('9.63'), 5, 2)
-        paramLayout.addWidget(QLineEdit('15'), 5, 3)
 
         paramLayout.addWidget(QLabel('C'), 6, 0)
         paramLayout.addWidget(QLineEdit('3.81'), 6, 1)
         paramLayout.addWidget(QLineEdit('9.63'), 6, 2)
-        paramLayout.addWidget(QLineEdit('15'), 6, 3)
 
         # Shielding wires
         paramLayout.addWidget(QLabel('S1'), 7, 0)
         paramLayout.addWidget(QLineEdit('-2.08'), 7, 1)
         paramLayout.addWidget(QLineEdit('12.73'), 7, 2)
-        paramLayout.addWidget(QLineEdit('15'), 7, 3)
 
         paramLayout.addWidget(QLabel('S2'), 8, 0)
         paramLayout.addWidget(QLineEdit('2.08'), 8, 1)
         paramLayout.addWidget(QLineEdit('12.73'), 8, 2)
-        paramLayout.addWidget(QLineEdit('15'), 8, 3)
 
         # Objects
         paramLayout.addWidget(QLabel('Object'), 9, 0)
@@ -485,10 +538,10 @@ class SysView(QWidget):
         paramLayout.addWidget(QLabel(''), 12, 1)
 
         paramLayout.addWidget(QLabel('Line length (km)'), 13, 0)
-        paramLayout.addWidget(QLineEdit('100'), 13, 1)
+        paramLayout.addWidget(QLineEdit('20'), 13, 1)
 
         paramLayout.addWidget(QLabel('Flash density (strike/km2/y)'), 14, 0)
-        paramLayout.addWidget(QLineEdit('10'), 14, 1)
+        paramLayout.addWidget(QLineEdit('5'), 14, 1)
 
         paramLayout.addWidget(QLabel('Flashover rate (per year)'), 15, 0)
         paramLayout.addWidget(QLabel(''), 15, 1)
@@ -518,6 +571,35 @@ class SysView(QWidget):
 
         rate = paramLayout.itemAtPosition(0,1).widget()
         rate.pressed.connect(calcFlashRate)
+
+        @pyqtSlot()
+        def updateCoordinates():
+            wireCoord = self.openEtran.readWireCoordinates()
+
+            # Wire coordinates in text fields
+            # Check conductor number, if 1 then it's A, 2 is B etc.
+            for coord in wireCoord['conductor']:
+                try:
+                    num = int(coord[0])
+                except ValueError:
+                    print('Bad number on conductor')
+                    continue
+
+                y = coord[1]
+                x = coord[2]
+
+                if num < 1 or num > 5:
+                    print('Bad number on conductor')
+                    continue
+
+                xField = paramLayout.itemAtPosition(num+3, 1).widget()
+                xField.setText(x)
+
+                yField = paramLayout.itemAtPosition(num+3, 2).widget()
+                yField.setText(y)
+
+        coordinates = paramLayout.itemAtPosition(0,2).widget()
+        coordinates.pressed.connect(updateCoordinates)
 
     def paintEvent(self, e):
         qp = QPainter()
@@ -668,7 +750,7 @@ class SysView(QWidget):
 
     def drawGround(self, qp, coord):
         grid = self.paramBox.layout()
-        pen = QPen(Qt.darkGreen, 20, Qt.SolidLine)
+        pen = QPen(Qt.darkGreen, 10, Qt.SolidLine)
 
         qp.setPen(pen)
 
