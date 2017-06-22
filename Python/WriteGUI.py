@@ -16,7 +16,8 @@ import Add_Delete_Widgets
 def writeWidgets(openetran, grid, name, rowOffset, numCol, notEven):
     countTotal = grid.count()
     count = 0 # current count of the elements in the layout
-    i = 0 # index of the current list (each key containing a list of lists)
+    i = 0 # index of the current element type (each key in the main dictionnary
+          # contains a list of lists: a list of elements, each containing a list of parameters)
 
     rowStart = 2
     rowEnd = rowStart + rowOffset
@@ -148,35 +149,7 @@ def writeGround(self, openetran):
         for k in range(num - 1):
             Add_Delete_Widgets.addGround(self, grid)
 
-    countTotal = grid.count()
-    count = 0 # current count of the elements in the layout
-    i = 0 # index of the current list (each key containing a list of lists)
-
-    rowStart = 2
-    rowEnd = rowStart + 5
-
-    while count < countTotal:
-        # List of positions of each text fields in the layout
-        positions = [(a,b) for a in range(rowStart, rowEnd) for b in range(1, 6, 2)]
-        k = 0
-
-
-        for position in positions:
-            count = (position[0] + 1) * (position[1] + 1)
-
-            if position[0] == rowEnd-1:
-                continue
-
-            else:
-                v = openetran['ground'][i][k]
-                widget = grid.itemAtPosition(position[0], position[1]).widget()
-                widget.setText(v)
-                k += 1
-
-        rowStart = rowEnd + 1
-        rowEnd = rowStart + 5
-        i += 1
-        k = 0
+    writeWidgets(openetran, grid, 'ground', 4, 6, 0)
 
 def writeSurge(self, openetran):
     grid = self.Surge.layout()

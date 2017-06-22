@@ -29,6 +29,8 @@ def addWidgets(grid, names, rowEnd, ColEnd):
 
         grid.addWidget(widget, *position)
 
+# Function to connect the Add/Delete buttons on each tabs, which are always located at positions
+# (0,0) and (0,1) respectively in the tab's layout.
 def connectButtons(layout, newFunction, deleteFunction):
     new = layout.itemAtPosition(0,0).widget()
     new.pressed.connect(newFunction)
@@ -46,7 +48,6 @@ class GUi_Tab(object):
 
         save = QPushButton('Save')
         load = QPushButton('Load')
-        projName = QLineEdit('Project_Name')
 
         # RadioButtons to select the simplified or full interface. Simplified selected by default
         guiSimple = QRadioButton('Simplified interface')
@@ -56,7 +57,6 @@ class GUi_Tab(object):
 
         grid.addWidget(save, 0, 0)
         grid.addWidget(load, 0, 1)
-        grid.addWidget(projName, 0, 2)
         grid.addWidget(guiSimple, 0, 3)
         grid.addWidget(guiNormal, 0, 4)
 
@@ -150,13 +150,9 @@ class GUi_Tab(object):
                  'R60 (Ohm)', '', 'Resistivity (Ohm.m)', '', 'Soil Breakdown Gradient (V.m)', '',
                  'Downlead Inductance (H/m)', '', 'Length of downlead (m)', '', 'Counterpoise radius (m)', '',
                  'Counterpoise depth (m)', '', 'Counterpoise length (m)', '', 'Number of segments', '',
-                 'Soil relative permittivity', '', 'Pairs', '', 'Poles', '',
-                 'R60 counterpoise', '/', '/', '/', '/', '/']
+                 'Soil relative permittivity', '', 'Pairs', '', 'Poles', '']
 
-        addWidgets(grid, names, 7, 6)
-
-        label = grid.itemAtPosition(6,1).widget()
-        label.setText('N/A')
+        addWidgets(grid, names, 6, 6)
 
         Tab.addTab(self.Ground, 'Ground')
 
@@ -392,9 +388,9 @@ class GUi_Tab(object):
         @pyqtSlot()
         def saveProject():
             # Read the structure in the GUI in case it changed
-            openetran = ReadStruct.read(self, projName, guiNormal)
+            openetran = ReadStruct.read(self, guiNormal)
 
-            Project.saveProject(openetran, openetran['name'])
+            Project.saveProject(self, openetran)
             print('Project saved')
 
             return openetran
@@ -422,7 +418,7 @@ class GUi_Tab(object):
 
         @pyqtSlot()
         def calculateR60():
-            openetran = ReadStruct.read(self, projName, guiNormal)
+            openetran = ReadStruct.read(self, guiNormal)
             R60.calcR60(openetran, self.Ground.layout())
 
         @pyqtSlot()
@@ -580,7 +576,16 @@ class GUi_Tab(object):
         plotMode.toggled.connect(simOneShot)
         critMode.toggled.connect(simCrit)
 
-if __name__ == '__main__':
+    # Used in the Visualization class to update the wires' coordinates
+    # Returns a dictionnary with all wires' coordinates
+    def readWireCoordinates(self):
+        struct= dict()
+        struct['conductor'] = list()
+
+        ReadStruct.readConductor(self, struct)
+        return struct
+
+def main():
     app = QApplication(sys.argv)
 
     # Main tab window
@@ -588,7 +593,10 @@ if __name__ == '__main__':
     ui = GUi_Tab()
     ui.setupUi(Tab)
 
-    sysView = Draw.SysView()
+    Draw.SysView(ui)
 
     Tab.show()
     sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    main()

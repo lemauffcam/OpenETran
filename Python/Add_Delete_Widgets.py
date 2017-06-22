@@ -39,10 +39,9 @@ def removeWidgets(grid, initCount, rowOffset, numCol):
     if count == initCount:
         return 1
 
-    else:
-        rowEnd = int(count / numCol)
-        rowStart = rowEnd - rowOffset
-        positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(numCol)]
+    rowEnd = int(count / numCol)
+    rowStart = rowEnd - rowOffset
+    positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(numCol)]
 
     # Removing a widget's parents removes the widget in PyQt
     for position in positions:
@@ -72,20 +71,14 @@ def addGround(self, grid):
              'Counterpoise radius (m)', '', 'Counterpoise depth (m)', '',
              'Counterpoise length (m)', '', 'Number of segments', '',
              'Soil relative permittivity', '',
-             'Pairs', '', 'Poles', '',
-             'R60 counterpoise', '/', '/', '/', '/', '/']
+             'Pairs', '', 'Poles', '']
 
-    addWidgets(grid, names, 6, 6)
-
-    # R60 value label
-    rowCount = int(grid.count() / 6)
-    label = grid.itemAtPosition(rowCount - 1, 1).widget()
-    label.setText('N/A')
+    addWidgets(grid, names, 5, 6)
 
 # Function strictly identical to the one deleting conductors. No need to rewrite it.
 def deleteGround(self, grid):
     # 36 is the number of elements when the tab was first created (including buttons)
-    return removeWidgets(grid, 42, 6, 6)
+    return removeWidgets(grid, 36, 5, 6)
 
 def addArrester(self, grid):
     names = ['Arrester', '/', '/', '/',

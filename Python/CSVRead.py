@@ -10,7 +10,7 @@ into a dictionnary.
 
 import csv
 
-def read(openETran, fileName, plotDict):
+def read(fileName, plotDict):
     with open(fileName, 'r', newline = '') as csvFile:
         # Read the csv file
         plots = csv.reader(csvFile, dialect = 'excel', delimiter = ',', quotechar = '|')

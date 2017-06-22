@@ -42,19 +42,13 @@ def readWidgets(openetran, grid, name, rowOffset, numCol, notEven):
                 widget = grid.itemAtPosition(position[0], position[1]).widget()
                 listParam.append(widget.text())
 
-        # Append the list of values (which makes a whole element) in the key list
+        # Append the list of values (which makes for one whole component) in the key list
         openetran[name].append(listParam)
         rowStart = rowEnd + 1
         rowEnd = rowStart + rowOffset
 
-def read(self, nameTextField, guiNormal):
+def read(self, guiNormal):
     openetran = dict()
-    name = nameTextField.text()
-
-    if name == '':
-        openetran['name'] = 'newProject'
-    else:
-        openetran['name'] = name
 
     openetran['simulation'] = list()
     openetran['conductor'] = list()
@@ -138,36 +132,9 @@ def readConductor(self, openetran):
     grid = self.Conductor.layout()
     readWidgets(openetran, grid, 'conductor', 3, 4, 1)
 
-# Particular case for ground because we don't need to read the last line (R60 label)
 def readGround(self, openetran):
     grid = self.Ground.layout()
-
-    countTotal = grid.count()
-    count = 0 # current count of the elements
-
-    rowStart = 2
-    rowEnd = rowStart + 5
-
-    while count < countTotal:
-        # Positions of all text fields in each element of the tab
-        positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(1, 6, 2)]
-        listParam = list()
-
-
-        for position in positions:
-            count = (position[0] + 1) * (position[1] + 1)
-
-            if position[0] == rowEnd - 1:
-                continue
-
-            else:
-                widget = grid.itemAtPosition(position[0], position[1]).widget()
-                listParam.append(widget.text())
-
-        # Append the list of values (which makes a whole element) in the key list
-        openetran['ground'].append(listParam)
-        rowStart = rowEnd + 1
-        rowEnd = rowStart + 5
+    readWidgets(openetran, grid, 'ground', 4, 6, 0)
 
 def readSurge(self, openetran):
     grid = self.Surge.layout()
