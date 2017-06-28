@@ -448,14 +448,15 @@ int read_cables (struct span *defn)
 
 /*  &&&&  read conductors and set up modal transformation   */
 
-static void transform_conductors (struct span *defn, gsl_vector *x, gsl_vector *y, gsl_vector *r, gsl_vector *v)
+static void transform_conductors (struct span *defn, gsl_vector *x, gsl_vector *y, gsl_vector *r, gsl_vector *v,
+								  gsl_vector *sag, gsl_vector *nbundle, gsl_vector *dbundle)
 {
 	gsl_matrix *zcopy;
 	gsl_vector *lambda;
 	gsl_eigen_symmv_workspace *w;
 	gsl_permutation *p;
 	int signum;
-	double dx, dy, hs, yi, yj, xi, xj, ri;
+	double dx, dy, hs, yi, yj, xi, xj, ri, zs, zm, nb, db, zeq;
 	int n = number_of_conductors;
 	int i, j;
 
@@ -481,9 +482,21 @@ static void transform_conductors (struct span *defn, gsl_vector *x, gsl_vector *
 
 	for(i = 0; i < n; i++) {
 		xi = gsl_vector_get (x, i);
-		yi = gsl_vector_get (y, i);
+		yi = gsl_vector_get (y, i) - 0.6667 * gsl_vector_get (sag, i);
 		ri = gsl_vector_get (r, i);
-		gsl_matrix_set (defn->Zp, i, i, 60.0 * log (2.0 * yi / ri));
+		nb = gsl_vector_get (nbundle, i);
+		db = gsl_vector_get (dbundle, i);
+		zs = 60.0 * log(2.0 * yi / ri);
+		zm = 0.0;
+		if (nb >= 3.9) { // only up to 4 subconductors
+			zm = 20.0 * (2.0 * log(2.0 * yi / db) + log(1.414214 * yi / db));
+		} else if (nb >= 2.9) {
+			zm = 60.0 * log(2.0 * yi / db);
+		} else if (nb >= 1.9) {
+			zm = 60.0 * log(2.0 * yi / db);
+		}
+		zeq = (zs + (nb - 1.0)*zm) / nb;
+		gsl_matrix_set(defn->Zp, i, i, zeq);
 		for(j = (i+1); j < n; j++) {
 			xj = gsl_vector_get (x, j);
 			yj = gsl_vector_get (y, j);
@@ -561,7 +574,7 @@ void allocate_definition_memory (struct span *defn, int n)
 
 int read_conductors (struct span *defn)
 {
-	gsl_vector *height, *radius, *location, *voltage;
+	gsl_vector *height, *radius, *location, *voltage, *sag, *nbundle, *dbundle;
 	int i, n;
 	int using_geometry;
 	int count_conductors;
@@ -577,6 +590,9 @@ int read_conductors (struct span *defn)
 	radius = gsl_vector_calloc (n);
 	location = gsl_vector_calloc (n); /* horizontal displacement from pole centerline */
 	voltage = gsl_vector_calloc (n);
+	sag = gsl_vector_calloc (n);
+	nbundle = gsl_vector_calloc (n);
+	dbundle = gsl_vector_calloc (n);
 
 /*  read n conductors from fp   */
 
@@ -606,6 +622,9 @@ int read_conductors (struct span *defn)
 				next_double (gsl_vector_ptr (location, i-1));
 				next_double (gsl_vector_ptr (radius, i-1));
 				next_double (gsl_vector_ptr (voltage, i-1));
+				if (next_double (gsl_vector_ptr (sag, i-1)) > 0) gsl_vector_set (sag, i-1, 0.0);
+				if (next_double (gsl_vector_ptr (nbundle, i-1)) > 0) gsl_vector_set (nbundle, i-1, 1.0);
+				if (next_double (gsl_vector_ptr (dbundle, i-1)) > 0) gsl_vector_set (dbundle, i-1, 0.457201);
 			} else {
 				if (logfp) fprintf( logfp, "bad conductor number %d\n", i);
 				oe_exit (ERR_CONDUCTOR_N);
@@ -638,13 +657,16 @@ int read_conductors (struct span *defn)
 			allocate_definition_memory (defn, number_of_conductors);
 		}
 
-		transform_conductors (defn, location, height, radius, voltage);
+		transform_conductors (defn, location, height, radius, voltage, sag, nbundle, dbundle);
 	}
 
 	gsl_vector_free (height);
 	gsl_vector_free (radius);
 	gsl_vector_free (location);
 	gsl_vector_free (voltage);
+	gsl_vector_free (sag);
+	gsl_vector_free (nbundle);
+	gsl_vector_free (dbundle);
 
 	return (0);
 }
