@@ -27,7 +27,7 @@
 #include "OETypes.h"
 
 #ifdef linux
-#define strnicmp strncasecmp
+#define _strnicmp strncasecmp
 #endif
 
 #ifdef __APPLE__
