@@ -1,0 +1,17 @@
+4 5 30 1 1 0.02e-6 25e-6
+conductor 1 10 -1.5 0.0715 3854 
+conductor 2 10.5 0 0.0715 11097 
+conductor 3 10 1.5 0.0715 7243
+conductor 4 8 0 0.0715 0
+
+surge 50000 0.00000383 0.000103638 
+pairs 4 0
+poles 3
+
+ground -3.622 100.0 300000 0.0000005 10.0
+pairs 4 0
+poles 3
+
+meter
+pairs 4 0
+poles 3

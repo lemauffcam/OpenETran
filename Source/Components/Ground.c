@@ -30,6 +30,7 @@ Called from the driver and xfmr modules. */
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_linalg.h>
+#include <gsl/gsl_roots.h>
 
 #include "../OETypes.h"
 #include "../Parser.h"
@@ -38,6 +39,44 @@ Called from the driver and xfmr modules. */
 #include "../WritePlotFile.h"
 #include "Pole.h"
 #include "Ground.h"
+
+double rs_function (double rs, void *params)
+{
+	struct rs_params *p = (struct rs_params *) params;
+	double ret;
+	double rp = p->rp;
+	int n = p->n;
+	double r60 = p->r60;
+	double a = rp / rs;
+	double s = sqrt(1.0 + 4.0 * a);
+	double pls = 1.0 + s;
+	double mns = 1.0 - s;
+	int i;
+	double pls_n = 1.0;
+	double mns_n = 1.0;
+	for (i = 0; i < n; i++) {
+		pls_n *= pls;
+		mns_n *= mns;
+	}
+	pls_n *= pls_n; /* now pls^2n */
+	mns_n *= mns_n;
+
+	ret = 0.5 * rs * (pls_n * pls - mns_n * mns) / (pls_n - mns_n);
+
+	return ret - r60;
+}
+
+double rdwight_cp (double len, double a, double h, double rho)
+{
+	double x = 0.5 * len;
+	double s = 2.0 * h;
+	double term1, term2, term3, term4;
+	term1 = log (4.0 * x / a);
+	term2 = log (4.0 * x / s);
+	term3 = s / 2.0 / x;
+	term4 = term3 * s / 8.0 / x;
+	return (0.5 * rho / TWOPI / x) * (term1 + term2 + term3 + term4 - 2.0);
+}
 
 /* Returns the shunt capa value in infinite medium
 	ai : soil ionized zone radius
@@ -264,8 +303,16 @@ double R60, double Rho, double e0, double L)
 void add_counterpoise(struct ground *ptr, double a, double length, double h, int numSeg,
 						double rho, double perm, double e0) {
 
-	double li, ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
+	double li, Ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
 	int signum, i, j;
+	/* root solver parameters */
+	struct rs_params params;
+	double r_lo, r_hi;
+	double itertol = 1.0e-3;
+	const gsl_root_fsolver_type *T;
+	gsl_root_fsolver *s;
+	gsl_function F;
+	int status, iter=0, maxiter=100;
 	
 	ptr->numSeg = numSeg;
 	ptr->counterpoise = 1;
@@ -274,6 +321,12 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	if (!numSeg) {
 		return;
 	}
+
+	/* set up the GSL root finder */
+	F.function = &rs_function;
+	F.params = &params;
+	T = gsl_root_fsolver_brent;
+	s = gsl_root_fsolver_alloc (T);
 
 	li = length / ((double)numSeg);
 	ptr->depthC = h;
@@ -297,12 +350,6 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 
 	ptr->hist = gsl_vector_calloc(numSeg);
 
-	/* Resistance of 1 segment of the conductor, constant in the current model */
-	ri = rho / (2 * M_PI * li) * ((2 * h + a) / li + log((li + sqrt(li * li + a * a)) / a)
-		- sqrt(1 + pow(a / li, 2)) + log((li + sqrt(li * li + 4 * h * h)) / (2 * h)) - sqrt(1 + pow(2 * h / li, 2)));
-
-	ptr->ri = ri;
-
 	/* Inductance of 1 segment of the counterpoise, constant in the current model */
 	Li = U0 * li / (2 * M_PI) * (log(2 * li / a) - 1);
 
@@ -317,15 +364,41 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 		gsl_vector_set(ptr->Gi, i, Gi);
 	}
 
+	/* Resistance of 1 segment of the conductor, constant in the current model */
+	/* - not using this from the paper; seems to be an error as the resistances are much too high 
+	ri = rho / (2 * M_PI * li) * ((2 * h + a) / li + log((li + sqrt(li * li + a * a)) / a)
+    	- sqrt(1 + pow(a / li, 2)) + log((li + sqrt(li * li + 4 * h * h)) / (2 * h)) - sqrt(1 + pow(2 * h / li, 2)));
+    */
+	r_lo = 1.0e-6;
+	r_hi = 1.0e3;
+	params.n = numSeg;
+	params.rp = 1.0 / Gi;
+	params.r60 = rdwight_cp (length, a, h, rho);
+	gsl_root_fsolver_set (s, &F, r_lo, r_hi);
+	do {
+		++iter;
+		status = gsl_root_fsolver_iterate (s);
+		Ri = gsl_root_fsolver_root (s);
+		r_lo = gsl_root_fsolver_x_lower (s);
+		r_hi = gsl_root_fsolver_x_upper (s);
+		status = gsl_root_test_interval (r_lo, r_hi, itertol, 0.0);
+		if (status == GSL_SUCCESS) {
+			ptr->ri = Ri;
+		}
+	} while (status == GSL_CONTINUE && iter < maxiter);
+
+	printf("Cpoise: R60=%8.3f Li=%8.3g Ci=%8.3g Rp=%8.3f Ri=%8.3f\n", 
+		   params.r60, Li, Ci, params.rp, Ri);
+
 	/* Fill out Ybus matrix */
 	for (i = 0; i < numSeg; i++) {
 		for (j = 0; j < numSeg; j++) {
 			if (i == j) {
-				y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
-			
+				y = 2 / (Ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
+				printf("  setting y(%d,%d)=%g\n", i, j, y);
 			} else if (abs(i - j) == 1) {
-				y = -1 / (ri + 2 * Li / dT);
-			
+				y = -1 / (Ri + 2 * Li / dT);
+				printf("  setting y(%d,%d)=%g\n", i, j, y);
 			} else {
 				y = 0;
 			}
@@ -335,16 +408,20 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	}
 
 	/* First segment's admittance */
-	y = 1 / (ri + 2 * Li / dT);
+	y = 1 / (Ri + 2 * Li / dT);
+	printf("  setting y(%d,%d)=%g\n", 0, 0, y);
 	gsl_matrix_set(ptr->Ybus, 0, 0, y);
 
 	/* Last segment's admittance */
-	y = 1 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
+	y = 1 / (Ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
+	printf("  setting y(%d,%d)=%g\n", numSeg-1, numSeg-1, y);
 	gsl_matrix_set(ptr->Ybus, numSeg - 1, numSeg - 1, y);
 
 	/* Admittance matrix triangularization */
 	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
 	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
+
+	gsl_root_fsolver_free (s);
 
 	return;
 } /* add_counterpoise */
@@ -415,6 +492,8 @@ void updateModel(struct ground *ptr) {
 
 	Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
 	Gi = Ci / (perm * ptr->rho);
+
+//	printf("Cpoise update: i=%g dI=%g ai=%g Ci=%g Rp=%g\n", i, dI, ai, Ci, 1.0/Gi);
 
 	/* Update history current again with the new value of Ci (conservation of charge) */
 	gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);

@@ -95,4 +95,12 @@ void add_counterpoise(struct ground *ptr, double radius, double length, double d
 
 struct ground *find_ground (int at, int from, int to);
 
+struct rs_params {
+	double r60;
+	double rp;
+	int n;
+};
+double rs_function (double rs, void *params);
+
+
 #endif
