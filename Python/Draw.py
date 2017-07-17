@@ -127,7 +127,7 @@ def arcIntersection(x1, y1, x2, y2, rc):
                 return (x_inter, y_inter)
 
     elif y1 != y2 and x1 == x2:
-        y_inter = (x2*x2 - x1*x1) / (2*y2 - 2*y1)
+        y_inter = (y2*y2 - y1*y1) / (2*y2 - 2*y1)
 
         if y_inter < y1 and y_inter < y2:
             return
@@ -249,6 +249,12 @@ def groundIntersections(x, y, rc, rg, slope, obj):
 
     return intList
 
+# Function returning a boolean saying whether the point at (x,y) is contained or not.
+# x,y : current point coordinates
+# coord: list of wires coordinates
+# obj: list of objects coordinates
+# rc,rg: striking distances
+# k1,k2: indexes of the 2 arcs that intersect at the point (x,y)
 def isContained(x, y, coord, obj, rc, rg, k1, k2):
     arcContained = False
     for i in range(len(coord[0])):
@@ -267,6 +273,8 @@ def isContained(x, y, coord, obj, rc, rg, k1, k2):
     contained = arcContained or groundContained
     return contained
 
+# Function to calculate the yearly flashover rate on the whole line
+# Result is displayed in a label on the GUI
 def flashRate(self):
     grid = self.paramBox.layout()
     coord = readCoordinates(self)
@@ -354,15 +362,19 @@ def flashRate(self):
         return
 
     flashRate_Total = list() # List of flashover rates at each pole
+    numPoles = len(icritList[0]) # Number of poles in the analysis
 
-    for i in range(len(icritList[0])):
+    # Loop over all the poles for each phase
+    for i in range(numPoles):
         icrit = list()
         for j in range(5):
             icrit.append(icritList[j][i])
 
-        pLast = 1.0 # probability that the current is higher than zero kA
+        pLast = 1.0 # Probability that the current is higher than zero kA
         flashRate_Pole = 0.0 # Flashover rate at the current pole
 
+        # Loop over several current values for each phases and add the contributions to the
+        # local flashover rate
         for current in [x * 0.5 for x in range(5, 601)]:
             rc, rg = strikeDistance(self, current)
             expo = list() # list of exposure widths
@@ -375,7 +387,7 @@ def flashRate(self):
                     continue
 
                 intersec = list() # list of all intersections, with arcs and ground lines
-                uncontainedInt = list()  # list of uncontained intersections, by neither another arc
+                exposedInt = list()  # list of exposed intersections, by neither another arc
                                          # nor the ground
                 x = coord[0][k] # Wire coordinates
                 y = coord[1][k]
@@ -389,14 +401,14 @@ def flashRate(self):
                 # Intersections with the ground and object lines
                 intersec.append(groundIntersections(x, y, rc, rg, slope, obj))
 
-                # Isolate the uncontained arc intersections
+                # Isolate the exposed arc intersections
                 for i in range(0, 4):
                     if intersec[i] is not None:
                         x_i = intersec[i][0]
                         y_i = intersec[i][1]
 
                         if isContained(x_i, y_i, coord, obj, rc, rg, k, (k + i + 1)%5) == False:
-                            uncontainedInt.append( (x_i, y_i) )
+                            exposedInt.append( (x_i, y_i) )
 
                 # Same with ground intersections
                 if len(intersec[4]) > 0:
@@ -405,23 +417,23 @@ def flashRate(self):
                         y_i = intersec[4][i+1] # Number of elements always even so no problem
 
                         if isContained(x_i, y_i, coord, obj, rc, rg, k, 5) == False:
-                            uncontainedInt.append( (x_i, y_i) )
+                            exposedInt.append( (x_i, y_i) )
 
-                if len(uncontainedInt) > 1:
+                if len(exposedInt) > 1:
                     width = 0
-                    # If the arc portion between 2 intersections is uncontained (i.e the point in the
-                    # middle is uncontained), we add the horizontal distance to the exposition width
-                    for i in range(len(uncontainedInt)):
-                        for j in range(len(uncontainedInt)):
+                    # If the arc portion between 2 intersections is exposed (i.e the point in the
+                    # middle is exposed), we add the horizontal distance to the exposition width
+                    for i in range(len(exposedInt)):
+                        for j in range(len(exposedInt)):
                             if i == j:
                                 continue
 
                             x0 = coord[0][k] # Phase coordinates
                             y0 = coord[1][k]
-                            x1 = uncontainedInt[i][0] # 1st intersection coordinates
-                            x2 = uncontainedInt[j][0] # 2nd intersection coordinates
+                            x1 = exposedInt[i][0] # 1st intersection coordinates
+                            x2 = exposedInt[j][0] # 2nd intersection coordinates
 
-                            x = (x1 + x2) / 2
+                            x = (x1 + x2) / 2 # (x,y) the coordinates of the point "in the middle"
 
                             A = 1
                             B = -2*y0
@@ -432,9 +444,9 @@ def flashRate(self):
 
                             if isContained(x, y, coord, obj, rc, rg, k, 5) == False:
                                 # With the current algorithm that distance is calculated twice. Hence the
-                                # /2. Since there are usually no more than 2 or 3 uncontained intersections
+                                # /2. Since there are usually no more than 2 or 3 exposed intersections
                                 # there's no need for a faster method
-                                width += abs(x1 - x2) / 2
+                                width += math.fabs(x1 - x2) / 2
 
                     expo.append(width)
 
@@ -444,23 +456,23 @@ def flashRate(self):
                    else:
                        expo.append(2*rc)
 
-            # Probability that the 1st stroke current is higher than this current
-            pFlash = 1/(1 + math.pow(current/31, 2.6))
+            pFlash = 1/(1 + math.pow(current/31, 2.6))  # Probability that the 1st stroke current is higher than this current
             pBin = pLast - pFlash # probability that the current is inside this histogram bin
 
             pLast = pFlash
 
             # Calculate the flashover rate using the exposure width
             for k in range(len(expo)):
-                flashRate_Pole += expo[k]/1000*length*flashDens*pBin
+                flashRate_Pole += expo[k]/1000*length/numPoles*flashDens*pBin
 
             del[expo]
 
         flashRate_Total.append(flashRate_Pole)
 
     # We display the average flashover rate for the whole line
-    flashRate_Average = sum(flashRate_Total) / max(len(flashRate_Total),1)
+    flashRate_Average = sum(flashRate_Total) / max(len(flashRate_Total), 1)
     label.setText(str(flashRate_Average))
+
     print('Flashover rate calculation complete')
 
     return
@@ -647,16 +659,15 @@ class SysView(QWidget):
                 condX = self.width() - self.drawView.width()/2 + coord[0][k]*hScale
                 condY = self.drawView.height() - coord[1][k]*vScale
 
-                condOut = condX < self.width() - self.drawView.width() or condX > self.width() \
+                outBounds = condX < self.width() - self.drawView.width() or condX > self.width() \
                             or condY < 0 or condY > self.height()
 
-                if condOut == True:
+                if outBounds == True:
                     break
 
             # Check if an arc is out of bounds
             for k in range(len(coord[0])):
-                if condOut == True:
-                    arcOut = True
+                if outBounds == True:
                     break
 
                 arcWidth = 2*rc*hScale
@@ -668,35 +679,26 @@ class SysView(QWidget):
                 arcOriginX = condX - arcWidth/2
                 arcOriginY = condY - arcHeight/2
 
-                arcOut = arcOriginX < self.width() - self.drawView.width() \
+                outBounds = arcOriginX < self.width() - self.drawView.width() \
                         or arcOriginX > self.width() or arcOriginX + arcWidth > self.width() \
-                        or arcOriginY > self.height() or arcOriginY < 0 \
+                        or arcOriginY > self.height() or arcOriginY + arcHeight < 0 \
                         or arcOriginY < 0
-
-                if arcOut == True:
-                    break
 
             # Check if an object is out of bounds
             for k in range(len(obj[0])):
-                if condOut == True or arcOut == True:
-                    objOut = True
+                if outBounds == True:
                     break
 
                 objX = self.width() - self.drawView.width()/2 + obj[0][k]*hScale
                 objY = self.drawView.height() - obj[1][k]*vScale
 
-                objOut = objX > self.width() or objX < self.width() - self.drawView.width() \
+                outBounds = objX > self.width() or objX < self.width() - self.drawView.width() \
                         or objY > self.height() or objY < 0
 
-                if objOut == True:
-                    break
-
             # If any element is out of bounds, we change the scales
-            if condOut == True or arcOut == True or objOut == True:
+            if outBounds == True:
                 hScale = 9 * hScale / 10
                 vScale = 9 * vScale / 10
-            else:
-                outBounds = False
 
 
         # Calculate phase wires new coordinates in screen scale
