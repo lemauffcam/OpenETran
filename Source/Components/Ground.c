@@ -131,6 +131,7 @@ void check_ground (struct ground *ptr) {
 		Vg = It * ptr->Ri; /* ground voltage rise caused by Ri times It */
 		/* inject this current into R60 to produce a back emf, so total ground voltage is Vg */
 		ptr->i_bias = Vg * (1.0 / ptr->Ri - ptr->y60);
+		printf("rod It, Ri, Vt, Vg, Ibias=%g %g %g %g %g\n", It, ptr->Ri, Vt, Vg, ptr->i_bias);
 	}
 
 	/* update past history of the built-in ground inductance */
@@ -140,6 +141,7 @@ void check_ground (struct ground *ptr) {
 	}
 
 	ptr->i = ptr->h * ptr->yzl + ptr->i_bias * ptr->yr;
+	printf("  check_ground Vl, h, i=%g %g %g\n", Vl, ptr->h, ptr->i);
 
 	return;
 } /* check_ground */
@@ -292,6 +294,9 @@ double R60, double Rho, double e0, double L)
 		/* No counterpoise by default */
 		ptr->counterpoise = 0;
 
+		printf("AddGround y60,Ig,zl,y,yr,yzl=%g %g %g %g %g %g\n",
+			   ptr->y60, ptr->Ig, ptr->zl, ptr->y, ptr->yr, ptr->yzl);
+
 		return (ptr);
 	} else {
 		if (logfp) fprintf( logfp, "can't allocate new ground\n");
@@ -303,7 +308,7 @@ double R60, double Rho, double e0, double L)
 void add_counterpoise(struct ground *ptr, double a, double length, double h, int numSeg,
 						double rho, double perm, double e0) {
 
-	double li, Ri, Li, Ci, Gi, y; /* Counterpoise parameters and branch admittance */
+	double li, Ri, Li, Ci, Gi, y, yfirst, ylast; /* Counterpoise parameters and branch admittance */
 	int signum, i, j;
 	/* root solver parameters */
 	struct rs_params params;
@@ -408,20 +413,22 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	}
 
 	/* First segment's admittance */
-	y = 1 / (Ri + 2 * Li / dT);
-	printf("  setting y(%d,%d)=%g\n", 0, 0, y);
-	gsl_matrix_set(ptr->Ybus, 0, 0, y);
+	yfirst = 1 / (Ri + 2 * Li / dT);
+	printf("  setting y(%d,%d)=%g\n", 0, 0, yfirst);
+	gsl_matrix_set(ptr->Ybus, 0, 0, yfirst);
 
 	/* Last segment's admittance */
-	y = 1 / (Ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
-	printf("  setting y(%d,%d)=%g\n", numSeg-1, numSeg-1, y);
-	gsl_matrix_set(ptr->Ybus, numSeg - 1, numSeg - 1, y);
+	ylast = 1 / (Ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
+	printf("  setting y(%d,%d)=%g\n", numSeg-1, numSeg-1, ylast);
+	gsl_matrix_set(ptr->Ybus, numSeg - 1, numSeg - 1, ylast);
 
 	/* Admittance matrix triangularization */
 	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
 	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
 
 	gsl_root_fsolver_free (s);
+
+	printf("AddCP yfirst,ylast=%g %g\n", yfirst, ylast);
 
 	return;
 } /* add_counterpoise */
@@ -456,6 +463,7 @@ void updateModel(struct ground *ptr) {
 		/* Calculate new values of Ci & Gi using the leaked current */
 		dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
 		ai = ptr->radiusC + dI * ptr->rho / (2 * M_PI * ptr->e0 * li);
+		/* ai = ptr->radiusC;  disabling */
 
 		Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
 		Gi = Ci / (perm * ptr->rho);
