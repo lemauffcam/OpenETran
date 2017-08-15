@@ -84,7 +84,7 @@ double rdwight_cp (double len, double a, double h, double rho)
 double shuntCapa(struct ground *ptr, double ai);
 
 /*	Update currents at each node for the new time step using previously calculated voltages
-	Update the Ybus matrix with the new values of Ci & Gi calculated with the leakage current
+	Update the Ybus diagonals with the new values of Ci & Gi calculated with the leakage current
 */
 void updateModel(struct ground *ptr);
 
@@ -105,45 +105,47 @@ void check_ground (struct ground *ptr) {
 
 	/* Counterpoise model if there's a counterpoise at the base of each pole */
 	if (ptr->counterpoise) {
-		/* We start by solving for the voltages at each node */
-		gsl_vector_set(ptr->current, 0, It);
-		gsl_linalg_LU_solve(ptr->yTri, ptr->yPerm, ptr->current, ptr->voltage);
+		/* We start by solving for the voltages at each node; history currents already loaded */
+		*gsl_vector_ptr(ptr->current, 0) += It; /* current injection from the balance of system */
+		gsl_linalg_solve_symm_tridiag(ptr->yDiag, ptr->yOff, ptr->current, ptr->voltage);
+		Vg = gsl_vector_get(ptr->voltage, 0); /* counterpoise/tower base voltage */
 
-		/* We then update the currents and the Ybus matrix for the next time step */
+		/* Update the components, history currents and Ybus diagonals for the next time step */
+//		printf("injected counterpoise It=%g\n", It);
 		updateModel(ptr);
 
-		/* Updated ground voltage */
-		Vg = gsl_vector_get(ptr->voltage, 0);
-
-		/* Current ground impulse resistance */
+		/* Bias current to add at node 0 so that Vg matches the system voltage */
 		if (Vg) {
-			ptr->Yi = It / Vg;
-
-			/* Bias current to add at node 0 so that Vg equals Vt */
-			ptr->i_bias = (Vt - Vg) * ptr->Yi;
-
+			ptr->i_bias = It - Vg / ptr->R60;
+			ptr->i_bias *= -1.0;
+//			printf("  setting i_bias from It and Vg %g %g %g\n", ptr->i_bias, It, Vg);
 		} else {
 			ptr->i_bias = 0;
 		}
-	
+//		ptr->i_bias = 0;
 	} else {
 		ptr->Ri = ptr->R60 / sqrt (1.0 + Imag / ptr->Ig); /* desired impulse resistance */
 		Vg = It * ptr->Ri; /* ground voltage rise caused by Ri times It */
 		/* inject this current into R60 to produce a back emf, so total ground voltage is Vg */
 		ptr->i_bias = Vg * (1.0 / ptr->Ri - ptr->y60);
-		printf("rod It, Ri, Vt, Vg, Ibias=%g %g %g %g %g\n", It, ptr->Ri, Vt, Vg, ptr->i_bias);
+//		printf("rod It, Ri, Vt, Vg, Ibias=%g %g %g %g %g\n", It, ptr->Ri, Vt, Vg, ptr->i_bias);
 	}
 
 	/* update past history of the built-in ground inductance */
 	Vl = Vt - Vg;
 	if (ptr->zl > 0.0) {
 		ptr->h = It + Vl / ptr->zl;
+//		printf(" tower inductance Vt, Vg, Vl, It, zl, h = %g %g %g %g %g %g\n",
+//			   Vt, Vg, Vl, It, ptr->zl, ptr->h);
 	}
 
 	ptr->i = ptr->h * ptr->yzl + ptr->i_bias * ptr->yr;
-	printf("  check_ground Vl, h, i=%g %g %g\n", Vl, ptr->h, ptr->i);
+//	printf("  check_ground Vt, Vg, Vl, h, i, i_bias=%g %g %g %g %g %g\n", 
+//		   Vt, Vg, Vl, ptr->h, ptr->i, ptr->i_bias);
 
 	return;
+	/* reset all the history injections to zero */
+	gsl_vector_set_zero(ptr->current);
 } /* check_ground */
 
 /* add ground bias current plus inductive past history current at the pole */
@@ -154,6 +156,7 @@ void inject_ground (struct ground *ptr) {
 	
 	c = ptr->parent->injection;
 	val = ptr->i;
+//	printf("  injecting %g\n", val);
 	*gsl_vector_ptr (c, ptr->from) -= val;
 	*gsl_vector_ptr (c, ptr->to) += val;
 }
@@ -294,8 +297,8 @@ double R60, double Rho, double e0, double L)
 		/* No counterpoise by default */
 		ptr->counterpoise = 0;
 
-		printf("AddGround y60,Ig,zl,y,yr,yzl=%g %g %g %g %g %g\n",
-			   ptr->y60, ptr->Ig, ptr->zl, ptr->y, ptr->yr, ptr->yzl);
+//		printf("AddGround y60,Ig,zl,y,yr,yzl=%g %g %g %g %g %g\n",
+//			   ptr->y60, ptr->Ig, ptr->zl, ptr->y, ptr->yr, ptr->yzl);
 
 		return (ptr);
 	} else {
@@ -308,8 +311,8 @@ double R60, double Rho, double e0, double L)
 void add_counterpoise(struct ground *ptr, double a, double length, double h, int numSeg,
 						double rho, double perm, double e0) {
 
-	double li, Ri, Li, Ci, Gi, y, yfirst, ylast; /* Counterpoise parameters and branch admittance */
-	int signum, i, j;
+	double li, Ri, Li, Ci, Gi, yseries, yshunt; /* Counterpoise parameters and branch admittance */
+	int i;
 	/* root solver parameters */
 	struct rs_params params;
 	double r_lo, r_hi;
@@ -343,17 +346,17 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	ptr->li = li;
 
 	/* Allocations */
-	ptr->Ybus = gsl_matrix_alloc(numSeg, numSeg);
-	ptr->yTri = gsl_matrix_alloc(numSeg, numSeg);
-	ptr->yPerm = gsl_permutation_alloc(numSeg);
+	ptr->yDiag = gsl_vector_calloc(numSeg+1);
+	ptr->yOff = gsl_vector_calloc(numSeg);
 	
-	ptr->voltage = gsl_vector_calloc(numSeg);
-	ptr->current = gsl_vector_calloc(numSeg);
+	ptr->voltage = gsl_vector_calloc(numSeg+1);
+	ptr->current = gsl_vector_calloc(numSeg+1);
 
 	ptr->Ci = gsl_vector_alloc(numSeg);
 	ptr->Gi = gsl_vector_alloc(numSeg);
 
-	ptr->hist = gsl_vector_calloc(numSeg);
+	ptr->hRL = gsl_vector_calloc(numSeg);
+	ptr->hC = gsl_vector_calloc(numSeg);
 
 	/* Inductance of 1 segment of the counterpoise, constant in the current model */
 	Li = U0 * li / (2 * M_PI) * (log(2 * li / a) - 1);
@@ -370,10 +373,6 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 	}
 
 	/* Resistance of 1 segment of the conductor, constant in the current model */
-	/* - not using this from the paper; seems to be an error as the resistances are much too high 
-	ri = rho / (2 * M_PI * li) * ((2 * h + a) / li + log((li + sqrt(li * li + a * a)) / a)
-    	- sqrt(1 + pow(a / li, 2)) + log((li + sqrt(li * li + 4 * h * h)) / (2 * h)) - sqrt(1 + pow(2 * h / li, 2)));
-    */
 	r_lo = 1.0e-6;
 	r_hi = 1.0e3;
 	params.n = numSeg;
@@ -391,132 +390,94 @@ void add_counterpoise(struct ground *ptr, double a, double length, double h, int
 			ptr->ri = Ri;
 		}
 	} while (status == GSL_CONTINUE && iter < maxiter);
-
-	printf("Cpoise: R60=%8.3f Li=%8.3g Ci=%8.3g Rp=%8.3f Ri=%8.3f\n", 
-		   params.r60, Li, Ci, params.rp, Ri);
-
-	/* Fill out Ybus matrix */
-	for (i = 0; i < numSeg; i++) {
-		for (j = 0; j < numSeg; j++) {
-			if (i == j) {
-				y = 2 / (Ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
-				printf("  setting y(%d,%d)=%g\n", i, j, y);
-			} else if (abs(i - j) == 1) {
-				y = -1 / (Ri + 2 * Li / dT);
-				printf("  setting y(%d,%d)=%g\n", i, j, y);
-			} else {
-				y = 0;
-			}
-
-			gsl_matrix_set(ptr->Ybus, i, j, y);
-		}
-	}
-
-	/* First segment's admittance */
-	yfirst = 1 / (Ri + 2 * Li / dT);
-	printf("  setting y(%d,%d)=%g\n", 0, 0, yfirst);
-	gsl_matrix_set(ptr->Ybus, 0, 0, yfirst);
-
-	/* Last segment's admittance */
-	ylast = 1 / (Ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
-	printf("  setting y(%d,%d)=%g\n", numSeg-1, numSeg-1, ylast);
-	gsl_matrix_set(ptr->Ybus, numSeg - 1, numSeg - 1, ylast);
-
-	/* Admittance matrix triangularization */
-	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
-	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
-
 	gsl_root_fsolver_free (s);
 
-	printf("AddCP yfirst,ylast=%g %g\n", yfirst, ylast);
+//	printf("Cpoise: UserR60=%8.4f DwightR60=%8.4f Li=%8.3g Ci=%8.3g Rp=%8.3f Ri=%8.3f\n", 
+//		   ptr->R60, params.r60, Li, Ci, params.rp, Ri);
 
+	/* Fill out Ybus matrix */
+	yseries = 1 / (Ri + 2 * Li / dT);
+	yshunt = Gi + 2 * Ci / dT;
+	gsl_vector_set(ptr->yDiag, 0, yseries);
+	gsl_vector_set(ptr->yDiag, numSeg, yseries + yshunt);
+	for (i = 1; i < numSeg; i++) {
+		gsl_vector_set(ptr->yDiag, i, 2 * yseries + yshunt);
+	}
+	for (i = 0; i < numSeg; i++) {
+		gsl_vector_set(ptr->yOff, i, -yseries);
+	}
 	return;
 } /* add_counterpoise */
 
 void updateModel(struct ground *ptr) {
-	double ri = ptr->ri, Li = ptr->Li, li = ptr->li, perm = ptr->relPerm * EPS0;
-	double Ci, Gi, i, dI, ai, y;
-	int k, signum;
+	double Ri = ptr->ri, Li = ptr->Li, li = ptr->li, perm = ptr->relPerm * EPS0;
+	double Ci, Gi, ai, yseries, yshunt, ycap, zhRL, Vfrom, Vto, Iseries, Icap, Ishunt;
+	double Itotal = 0.0;
+	int k;
 
 	/* There is no counterpoise here */
 	if (!ptr->numSeg) {
 		return;
 	}
 
-	/* We don't care about the current in the first segment since it's injected via the base of the tower */
-	for (k = 1; k < ptr->numSeg - 1; k++) {
+	/* Process each segment */
+	yseries = 1 / (Ri + 2 * Li / dT);
+	zhRL = 2 * Li / dT - Ri;
+	for (k = 0; k < ptr->numSeg; k++) {
 		Ci = gsl_vector_get(ptr->Ci, k);
 		Gi = gsl_vector_get(ptr->Gi, k);
+		Vfrom = gsl_vector_get(ptr->voltage, k);
+		Vto = gsl_vector_get(ptr->voltage, k+1);
+		ycap = 2 * Ci / dT;
+		yshunt = Gi + ycap;
 
-		i = -(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k - 1)) / (ri + 2 * Li / dT) +
-			(2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k) +
-			(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k + 1)) / (ri + 2 * Li / dT);
-
-		/* History current */
-		i -= gsl_vector_get(ptr->hist, k);
-
-		gsl_vector_set(ptr->current, k, i);
-
-		/* Update history current for next time step (will be changed again when Ci is updated) */
-		i -= (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
+		Iseries = (Vfrom - Vto) * yseries + gsl_vector_get(ptr->hRL, k);
+		Icap = Vto * ycap + gsl_vector_get(ptr->hC, k);
+		Ishunt = Vto * Gi + Icap;
+		/*
+		printf("     k Vfrom Vto Iseries Ishunt Icap Diff hRL hC = %d %g %g %g %g %g %g %g %g\n", 
+			   k, Vfrom, Vto, Iseries, Ishunt, Icap, Iseries - Ishunt, 
+			   gsl_vector_get(ptr->hRL, k), gsl_vector_get(ptr->hC, k));
+		*/
+		Itotal += Ishunt;
 
 		/* Calculate new values of Ci & Gi using the leaked current */
-		dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
-		ai = ptr->radiusC + dI * ptr->rho / (2 * M_PI * ptr->e0 * li);
-		/* ai = ptr->radiusC;  disabling */
-
+		ai = ptr->radiusC + Ishunt * ptr->rho / (2 * M_PI * ptr->e0 * li);
 		Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
 		Gi = Ci / (perm * ptr->rho);
 
-		/* Update history current again with the new value of Ci (conservation of charge) */
-		gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
+		/* Update history currents using the new value of Ci (conservation of charge) */
+		gsl_vector_set(ptr->hC, k, -Icap - 2 * Ci * Vto / dT);
+		gsl_vector_set(ptr->hRL, k, yseries * (zhRL * Iseries + Vfrom - Vto));
 
-		/* New admittance value for the Ybus matrix */
-		y = 2 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
-		gsl_matrix_set(ptr->Ybus, k, k, y);
+		/* New diagonal admittance value and current injection at the To node */
+		/* the diagonal element at node 0 stays fixed at yseries */
+		yshunt = Gi + 2 * Ci / dT;
+		if (k < ptr->numSeg - 1) { /* interior node */
+			gsl_vector_set(ptr->yDiag, k + 1, yshunt + yseries + yseries);
+		} else { /* last node */
+			gsl_vector_set(ptr->yDiag, k + 1, yshunt + yseries);
+		}
 
 		gsl_vector_set(ptr->Ci, k, Ci);
 		gsl_vector_set(ptr->Gi, k, Gi);
+		/* 
+		if (k == 0) {
+			printf("  counterpoise ionization in first segment, Iseries, ai, Ci, Gi = %g, %g, %g, %g\n", 
+				   Iseries, ai, Ci, Gi);
+    	}
+    	*/
 	}
+//	printf("  total shunt current is %g\n", Itotal);
 
-	/* Last node */
-	Ci = gsl_vector_get(ptr->Ci, k);
-	Gi = gsl_vector_get(ptr->Gi, k);
-
-	i = -(gsl_vector_get(ptr->voltage, k) - gsl_vector_get(ptr->voltage, k - 1)) / (ri + 2 * Li / dT) +
-		(2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
-	
-	/* History current */
-	i -= gsl_vector_get(ptr->hist, k);
-
-	gsl_vector_set(ptr->current, k, i);
-
-	/* Update history current for next time step (will be changed again when Ci is updated) */
-	i -= (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
-
-	/* Calculate new values of Ci & Gi using the leaked current */
-	dI = (2 * Ci / dT + Gi) * gsl_vector_get(ptr->voltage, k);
-	ai = ptr->radiusC + dI * ptr->rho / (2 * M_PI * ptr->e0 * li);
-
-	Ci = shuntCapa(ptr, ai) + shuntCapa(ptr, 2 * ptr->depthC - ai);
-	Gi = Ci / (perm * ptr->rho);
-
-//	printf("Cpoise update: i=%g dI=%g ai=%g Ci=%g Rp=%g\n", i, dI, ai, Ci, 1.0/Gi);
-
-	/* Update history current again with the new value of Ci (conservation of charge) */
-	gsl_vector_set(ptr->hist, k, i + 2 * Ci * gsl_vector_get(ptr->voltage, k) / dT);
-
-	/* New admittance value for the Ybus matrix */
-	y = 1 / (ri + 2 * Li / dT) + Gi + 2 * Ci / dT;
-	gsl_matrix_set(ptr->Ybus, k, k, y);
-
-	gsl_vector_set(ptr->Ci, k, Ci);
-	gsl_vector_set(ptr->Gi, k, Gi);
-
-	/* Triangularization of Ybus */
-	gsl_matrix_memcpy(ptr->yTri, ptr->Ybus);
-	gsl_linalg_LU_decomp(ptr->yTri, ptr->yPerm, &signum);
-
+	/* reset all the history current injections */
+	gsl_vector_set_zero(ptr->current);
+	for (k = 0; k < ptr->numSeg; k++) {
+		Iseries = gsl_vector_get (ptr->hRL, k);
+		Ishunt = gsl_vector_get (ptr->hC, k);
+		*gsl_vector_ptr(ptr->current, k+1) += (Iseries - Ishunt);
+		*gsl_vector_ptr(ptr->current, k) -= Iseries;
+	}
 	return;
 } /* updateModel */
 

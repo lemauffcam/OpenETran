@@ -9,7 +9,7 @@ surge -80e3 1e-6 50e-6 0
 pairs 4 0
 poles 6
 
-ground -16.8584 1000.0 300e3 0.5e-6 18.0 0.01 1.0 122.0 20 9.0 
+ground -63.56 1000.0 300e3 0.5e-6 18.0 
 pairs 4 0
 poles all
 

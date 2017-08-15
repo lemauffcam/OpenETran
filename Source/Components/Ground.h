@@ -29,38 +29,13 @@ extern char ground_token[];
 #define Y_CLOSE 1e+009 /* Short circuit admittance */
 
 struct ground {
+	/* Attributes for all grounds, and ground rods */
 	double R60; /* power frequency resistance */
 	double y60; /* admittance for R60 */
 	double Ri;  /* impulse ground resistance at present time step */
-	double Yi;  /* impulse ground admittance at present time step */
 	double Ig;  /* soil ionization current */
 	double y;   /* admittance for the pole y matrix */
 	double h;   /* past history current for built-in inductance */
-
-	int counterpoise; /* 1 if there's a counterpoise, 0 otherwise */
-	double depthC; /* Depth in m. of counterpoise conductor */
-	double radiusC; /* Radius in m. of counterpoise conductor */
-	double lengthC; /* Total length in m. of counterpoise conductor */
-	double li; /* Length of 1 segment of counterpoise conductor */
-	int numSeg; /* Number of segments (RLC & G cells) in the counterpoise conductor */
-	double rho; /* Resistivity of soil */
-	double relPerm; /* Relative electrical permittivity of soil */
-	double e0; /* Critical field gradient (electric field intensity on the boundary of the soil ionized zone) */
-
-	gsl_matrix *Ybus; /* Nodal admittance matrix */
-	gsl_matrix *yTri; /* Triangularized Ybus */
-	gsl_permutation *yPerm; /* Permutation matrix for LU decomposition */
-
-	gsl_vector *voltage; /* Voltage at each node */
-	gsl_vector *current; /* Current at each node */
-
-	double ri;
-	double Li;
-	gsl_vector *Ci;
-	gsl_vector *Gi;
-
-	gsl_vector *hist; /* History current */
-
 	double i;   /* total ground injection current */
 	double i_bias;  /* back-injection of current to simulate reduction from R60 to Ri */
 	double amps; /* total current in the ground */
@@ -71,6 +46,28 @@ struct ground {
 	int to;
 	struct pole *parent;
 	struct ground *next;
+
+	/* Counterpoise attributes and variables follow */
+	int counterpoise; /* 1 if there's a counterpoise, 0 otherwise */
+	double depthC; /* Depth in m. of counterpoise conductor */
+	double radiusC; /* Radius in m. of counterpoise conductor */
+	double lengthC; /* Total length in m. of counterpoise conductor */
+	double li; /* Length of 1 segment of counterpoise conductor */
+	int numSeg; /* Number of segments (RLC & G cells) in the counterpoise conductor */
+	double relPerm; /* Relative electrical permittivity of soil */
+	double e0; /* Critical field gradient (electric field intensity on the boundary of the soil ionized zone) */
+	double rho; /* Resistivity of soil */
+	/* solve a symmetric tridiagonal system of order numSeg+1 */
+	gsl_vector *yDiag;   /* Diagonal elements */
+	gsl_vector *yOff;    /* Off-Diagonal elements (will be constant) */
+	gsl_vector *voltage; /* Voltage at each node */
+	gsl_vector *current; /* Current at each node */
+	double ri; /* series elements do not depend on current */
+	double Li;
+	gsl_vector *Ci; /* shunt elements in each segment depend on current */
+	gsl_vector *Gi;
+	gsl_vector *hRL; /* History current in series ri, Li */
+	gsl_vector *hC;  /* History current in shunt Ci */
 };
 
 extern struct ground *ground_head, *ground_ptr;
