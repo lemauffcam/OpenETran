@@ -53,15 +53,16 @@ def removeWidgets(grid, initCount, rowOffset, numCol):
 def addConductor(self, grid):
     names = ['Conductor', '/', '/', '/',
              'Number', '', 'Height (m)', '',
-             'Horizontal Position (m)', '', 'Radius (m)', '',
-             'Voltage Bias (V)', '', '/', '/']
+             'Horizontal Position (m)', '','Radius (m)', '',
+             'Voltage Bias (V)', '', 'Sag (m)', '',
+             'Nb', '', 'Sb (m)', '']
 
-    addWidgets(grid, names, 4, 4)
+    addWidgets(grid, names, 5, 4)
 
 def deleteConductor(self, grid):
-    # 24 is the number of elements when the tab was first created (including buttons)
+    # 28 is the number of elements when the tab was first created (including buttons)
     # We delete all the conductor widgets, except for the 'New' and 'Delete' buttons
-    return removeWidgets(grid, 20, 4, 4)
+    return removeWidgets(grid, 24, 5, 4)
 
 def addGround(self, grid):
     names = ['Ground', '/', '/', '/', '/', '/',

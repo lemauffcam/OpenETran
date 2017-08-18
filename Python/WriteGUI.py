@@ -131,7 +131,7 @@ def writeConductor(self, openetran):
         for k in range(num - 1):
             Add_Delete_Widgets.addConductor(self, grid)
 
-    writeWidgets(openetran, grid, 'conductor', 3, 4, 1)
+    writeWidgets(openetran, grid, 'conductor', 4, 4, 0)
 
 # Particular case in ground because we don't write in the last row
 def writeGround(self, openetran):

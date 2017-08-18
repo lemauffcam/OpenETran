@@ -26,6 +26,13 @@ def writeKey(f, openetran, key):
                 err = 1
                 break
 
+        # In 'conductor', the last 3 fields are also optional
+        elif key == 'conductor':
+            for i in range(5):
+                if v[i] == '':
+                    err = 1
+                    break
+
         else:
             for i in range(len(v)):
                 if v[i] == '':

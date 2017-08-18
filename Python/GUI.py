@@ -101,9 +101,10 @@ class GUi_Tab(object):
                  'Conductor', '/', '/', '/',
                  'Number', '', 'Height (m)', '',
                  'Horizontal Position (m)', '','Radius (m)', '',
-                 'Voltage Bias (V)', '', '/', '/']
+                 'Voltage Bias (V)', '', 'Sag (m)', '',
+                 'Nb', '', 'Sb (m)', '']
 
-        addWidgets(grid, names, 5, 4)
+        addWidgets(grid, names, 6, 4)
 
         Tab.addTab(self.Conductor, 'Conductors')
 
@@ -389,16 +390,12 @@ class GUi_Tab(object):
         def saveProject():
             # Read the structure in the GUI in case it changed
             openetran = ReadStruct.read(self, guiNormal)
-
             Project.saveProject(self, openetran)
-            print('Project saved')
-
             return openetran
 
         @pyqtSlot()
         def loadProject():
             Project.loadProject(self, guiNormal)
-            print('Project loaded')
 
         @pyqtSlot()
         def newConductor():

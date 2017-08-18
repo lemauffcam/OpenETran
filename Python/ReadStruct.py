@@ -130,7 +130,7 @@ def readSimulation(self, openetran):
 
 def readConductor(self, openetran):
     grid = self.Conductor.layout()
-    readWidgets(openetran, grid, 'conductor', 3, 4, 1)
+    readWidgets(openetran, grid, 'conductor', 4, 4, 0)
 
 def readGround(self, openetran):
     grid = self.Ground.layout()
