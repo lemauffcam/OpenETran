@@ -390,12 +390,13 @@ class GUi_Tab(object):
         def saveProject():
             # Read the structure in the GUI in case it changed
             openetran = ReadStruct.read(self, guiNormal)
-            Project.saveProject(self, openetran)
+            self.lastDirectory = Project.saveProject(self, openetran, self.lastDirectory)
+
             return openetran
 
         @pyqtSlot()
         def loadProject():
-            Project.loadProject(self, guiNormal)
+            self.lastDirectory = Project.loadProject(self, guiNormal, self.lastDirectory)
 
         @pyqtSlot()
         def newConductor():
@@ -587,9 +588,10 @@ def main():
 
     # Main tab window
     Tab = QTabWidget()
-    ui = GUi_Tab()
-    ui.setupUi(Tab)
 
+    ui = GUi_Tab()
+    ui.lastDirectory = ''
+    ui.setupUi(Tab)
     Draw.SysView(ui)
 
     Tab.show()

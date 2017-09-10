@@ -9,35 +9,49 @@ Script with functions to save, load and simulate the project
 
 import json, subprocess
 import os.path as osp
+import platform
 from PyQt5.QtWidgets import QFileDialog
 import WriteGUI, ParseInput, CSVRead, Plot2D
-#from pkg_resources import resource_filename
 
 # Writes main structure into .JSON file
-def saveProject(self, openetran):
+def saveProject(self, openetran, lastDirectory):
     fileDialog = QFileDialog()
 
-    name = fileDialog.getSaveFileName(None, 'Save File', '/home', 'JSON Files (*.json)')
+    if lastDirectory == '':
+        name = fileDialog.getSaveFileName(None, 'Save File', '/home', 'JSON Files (*.json)')
+    else:
+        name = fileDialog.getSaveFileName(None, 'Save File', lastDirectory, 'JSON Files (*.json)')
 
     if name == ('',''):
-        return
+        print('Save cancelled')
+        return lastDirectory
     else:
        openetran['name'] = name[0]
+       lastDirectory = osp.dirname(name[0])
 
     with open(name[0], 'w') as f:
         json.dump(openetran, f, indent=2)
 
+    print('Project saved')
+    return lastDirectory
+
 # Reads main structure from .JSON file
-def loadProject(self, guiNormal):
+def loadProject(self, guiNormal, lastDirectory):
     openetran = dict()
     fileDialog = QFileDialog()
     dispNormal = False
 
     # Get project name
-    name = fileDialog.getOpenFileName(None, 'Save File', '/home', 'JSON Files (*.json)')
+    if lastDirectory == '':
+        name = fileDialog.getOpenFileName(None, 'Save File', '/home', 'JSON Files (*.json)')
+    else:
+        name = fileDialog.getOpenFileName(None, 'Save File', lastDirectory, 'JSON Files (*.json)')
 
     if name == ('',''):
-        return
+        print('Load cancelled')
+        return lastDirectory
+    else:
+        lastDirectory = osp.dirname(name[0])
 
     with open(name[0], 'r') as f:
         openetran = json.load(f)
@@ -51,6 +65,8 @@ def loadProject(self, guiNormal):
 
     # Write all values in the GUI text fields
     WriteGUI.write(self, openetran, dispNormal)
+    print('Project loaded')
+    return lastDirectory
 
 # Parses input file from main structure and calls openetran
 def simulateProject(plotMode, self, openetran):
@@ -73,18 +89,26 @@ def simulateProject(plotMode, self, openetran):
 
     # Executable file name prefix
     prefix = WriteGUI.__file__
+    prefix = osp.dirname(prefix)
 
-    k = len(prefix) - 4
-    j = prefix[k] # j starts as the last letter of the filename, before the extension
+    # OpenEtran executable file path depending on the machine's operating system
+    opSys = platform.platform()
 
-    while (j != '/' and j != "\\"):
-        k -= 1
-        j = prefix[k]
+    if 'Windows' in opSys:
+        prefix = osp.join(prefix, 'win')
+        execName = osp.join(prefix, 'openetran.exe')
 
-    prefix = prefix[0:k]
+    elif 'Linux' in opSys:
+        prefix = osp.join(prefix, 'linux')
+        execName = osp.join(prefix, 'openetran')
 
-    # OpenEtran executable file path
-    execName = osp.join(prefix, 'openetran.exe')
+    elif 'Mac' in opSys:
+        prefix = osp.join(prefix, 'macosx')
+        execName = osp.join(prefix, 'openetran')
+
+    else:
+        print('Architecture not recognized or not compatible')
+        return
 
     # One shot simulation mode with .csv plot files
     if plotMode.isChecked() == True:
