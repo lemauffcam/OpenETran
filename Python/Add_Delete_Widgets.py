@@ -11,6 +11,11 @@ from PyQt5.QtWidgets import (QLineEdit, QLabel, QComboBox)
 
 # General function to add widgets
 def addWidgets(grid, names, rowOffset, numCol):
+    LPM_KI = '7.785e-07'
+    LPM_E0 = '535e+03'
+    Ground_E0 = '400e+03'
+    Arrbez_ref = '0.051'
+
     count = grid.count()
     rowStart = int(count / numCol)  # Number of colums and number of elements are
                                     # always even, so the result will always be an int.
@@ -20,8 +25,8 @@ def addWidgets(grid, names, rowOffset, numCol):
     positions = [(i,j) for i in range(rowStart, rowEnd) for j in range(numCol)]
 
     for position, name in zip(positions, names):
-        if name == '':
-            widget = QLineEdit()
+        if name == '' or name == LPM_KI or name == LPM_E0 or name == Ground_E0 or name == Arrbez_ref:
+            widget = QLineEdit(name)
 
         elif name == '/':
             widget = QLabel()
@@ -67,7 +72,7 @@ def deleteConductor(self, grid):
 def addGround(self, grid):
     names = ['Ground', '/', '/', '/', '/', '/',
              'R60 (Ohm)', '', 'Resistivity (Ohm.m)', '',
-             'Soil Breakdown Gradient (V.m)', '',
+             'Soil Breakdown Gradient (V.m)', '400e+03',
              'Downlead Inductance (H/m)', '', 'Length of downlead (m)', '',
              'Counterpoise radius (m)', '', 'Counterpoise depth (m)', '',
              'Counterpoise length (m)', '', 'Number of segments', '',
@@ -98,7 +103,7 @@ def deleteArrester(self, grid):
 def addArrbez(self, grid):
     names = ['Arrbez', '/', '/', '/',
              'Sparkover voltage (V)', '', '10kA 8x20 discharge voltage (V)', '',
-             'Reference voltage (V)', '', 'Inductance of lead (H/m)', '',
+             'Reference voltage (p.u.)', '0.051', 'Inductance of lead (H/m)', '',
              'Lead length (m)', '', 'Plot arrester current ? (1/0)', '',
              'Pairs', '', 'Poles', '']
 
@@ -125,8 +130,8 @@ def deleteInsulator(self, grid):
 
 def addLPM(self, grid):
     names = ['LPM', '/', '/', '/',
-             'CFO (V)', '', 'E0 (V/m)', '',
-             'Kl (no unit)', '', 'Pairs', '',
+             'CFO (V)', '', 'E0 (V/m)', '535e+03',
+             'Kl (no unit)', '7.785e-07', 'Pairs', '',
              'Poles', '', '/', '/']
 
     addWidgets(grid, names, 4, 4)

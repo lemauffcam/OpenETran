@@ -145,9 +145,9 @@ def simulateProject(plotMode, self, openetran):
         outputFileName = openetran['name'][0:k-5] + '.txt'
 
         # Strings from the text fields
-        pole1 = grid.itemAtPosition(3, 3).widget().text()
-        pole2 = grid.itemAtPosition(4, 3).widget().text()
-        wire = grid.itemAtPosition(5, 3).widget().text()
+        pole1 = grid.itemAtPosition(7, 1).widget().text()
+        pole2 = grid.itemAtPosition(8, 1).widget().text()
+        wire = grid.itemAtPosition(9, 1).widget().text()
 
         # Str lists for the pole sequence for when OpenEtran is called
         poleSeq = list()

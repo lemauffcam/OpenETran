@@ -13,10 +13,15 @@ import Project, ReadStruct, Add_Delete_Widgets, R60, Draw
 
 # Function to add widgets on the tabs for the 1st time
 def addWidgets(grid, names, rowEnd, ColEnd):
+    LPM_KI = '7.785e-07'
+    LPM_E0 = '535e+03'
+    Ground_E0 = '400e+03'
+    Arrbez_ref = '0.051'
+
     positions = [(i,j) for i in range(rowEnd) for j in range(ColEnd)]
     for position, name in zip(positions, names):
-        if name == '':
-            widget = QLineEdit()
+        if name == '' or name == LPM_KI or name == LPM_E0 or name == Ground_E0 or name == Arrbez_ref:
+            widget = QLineEdit(name)
 
         elif name == 'New' or name == 'Delete' or name == 'Get Counterpoise R60':
             widget = QPushButton(name)
@@ -86,9 +91,13 @@ class GUi_Tab(object):
         grid.addWidget(critMode, 2, 3)
 
         # LineEdit fields for Critical current iteration mode
-        pole1 = QLineEdit('First pole to hit')
-        pole2 = QLineEdit('Last pole to hit')
-        wire = QLineEdit('Wire')
+        pole1 = QLineEdit()
+        pole2 = QLineEdit()
+        wire = QLineEdit()
+
+        pole1_text = QLabel('First pole to hit')
+        pole2_text = QLabel('Last pole to hit')
+        wire_text = QLabel('Wire sequence')
 
         Tab.addTab(self.Simulation, 'Simulation')
 
@@ -148,7 +157,7 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', 'Get Counterpoise R60', '/', '/', '/',
                  'Ground', '/', '/', '/', '/', '/',
-                 'R60 (Ohm)', '', 'Resistivity (Ohm.m)', '', 'Soil Breakdown Gradient (V.m)', '',
+                 'R60 (Ohm)', '', 'Resistivity (Ohm.m)', '', 'Soil Breakdown Gradient (V.m)', '400e+03',
                  'Downlead Inductance (H/m)', '', 'Length of downlead (m)', '', 'Counterpoise radius (m)', '',
                  'Counterpoise depth (m)', '', 'Counterpoise length (m)', '', 'Number of segments', '',
                  'Soil relative permittivity', '', 'Pairs', '', 'Poles', '']
@@ -204,7 +213,7 @@ class GUi_Tab(object):
         names = ['New', 'Delete', '/', '/',
                  'Arrbez', '/', '/', '/',
                  'Sparkover voltage (V)', '', '10kA 8x20 discharge voltage (V)', '',
-                 'Reference voltage (V)', '', 'Inductance of lead (H/m)', '',
+                 'Reference voltage (p.u)', '0.051', 'Inductance of lead (H/m)', '',
                  'Lead length (m)', '', 'Plot arrester current ? (1/0)', '',
                  'Pairs', '', 'Poles', '']
 
@@ -233,8 +242,8 @@ class GUi_Tab(object):
 
         names = ['New', 'Delete', '/', '/',
                  'LPM', '/', '/', '/',
-                 'CFO (V)', '', 'E0 (V/m)', '',
-                 'Kl (no unit)', '', 'Pairs', '',
+                 'CFO (V)', '', 'E0 (V/m)', '535e+03',
+                 'Kl (no unit)', '7.785e-07', 'Pairs', '',
                  'Poles', '', '/', '/']
 
         addWidgets(grid, names, 5, 4)
@@ -289,6 +298,7 @@ class GUi_Tab(object):
                  'Poles', '', '/', '/']
 
         addWidgets(grid, names, 4, 4)
+        Tab.addTab(self.Resistor, 'Resistor')
 
         # Capacitor Tab - not added by default (not part of simplified interface)
         self.Capacitor = QWidget()
@@ -348,7 +358,7 @@ class GUi_Tab(object):
                 Tab.addTab(self.Steepfront, 'Steepfront')
                 Tab.addTab(self.Arrester, 'Arrester')
                 Tab.addTab(self.Insulator, 'Insulator')
-                Tab.addTab(self.Resistor, 'Resistor')
+                # Tab.addTab(self.Resistor, 'Resistor')
                 Tab.addTab(self.Capacitor, 'Capacitor')
                 Tab.addTab(self.Inductor, 'Inductor')
                 Tab.addTab(self.Customer, 'Customer')
@@ -360,7 +370,7 @@ class GUi_Tab(object):
                 Tab.removeTab( Tab.indexOf(self.Steepfront) )
                 Tab.removeTab( Tab.indexOf(self.Arrester) )
                 Tab.removeTab( Tab.indexOf(self.Insulator) )
-                Tab.removeTab( Tab.indexOf(self.Resistor) )
+                # Tab.removeTab( Tab.indexOf(self.Resistor) )
                 Tab.removeTab( Tab.indexOf(self.Capacitor) )
                 Tab.removeTab( Tab.indexOf(self.Inductor) )
                 Tab.removeTab( Tab.indexOf(self.Customer) )
@@ -373,13 +383,21 @@ class GUi_Tab(object):
                 pole2.setParent(None)
                 wire.setParent(None)
 
+                pole1_text.setParent(None)
+                pole2_text.setParent(None)
+                wire_text.setParent(None)
+
         @pyqtSlot()
         def simCrit():
             if critMode.isChecked() == True:
                 grid = self.Simulation.layout()
-                grid.addWidget(pole1, 3, 3)
-                grid.addWidget(pole2, 4, 3)
-                grid.addWidget(wire, 5, 3)
+                grid.addWidget(pole1_text, 7, 0)
+                grid.addWidget(pole2_text, 8, 0)
+                grid.addWidget(wire_text, 9, 0)
+
+                grid.addWidget(pole1, 7, 1)
+                grid.addWidget(pole2, 8, 1)
+                grid.addWidget(wire, 9, 1)
 
         @pyqtSlot()
         def simulateProject():
@@ -581,6 +599,12 @@ class GUi_Tab(object):
         struct['conductor'] = list()
 
         ReadStruct.readConductor(self, struct)
+
+        # If 4 wires, we change the 5th wire coordinates to be equal to the 4th wire
+        if len(struct['conductor']) == 4:
+            struct['conductor'].append(list(struct['conductor'][3]))
+            struct['conductor'][4][0] = 5
+
         return struct
 
 def main():

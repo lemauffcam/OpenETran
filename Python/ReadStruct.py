@@ -58,13 +58,13 @@ def read(self, guiNormal):
     openetran['lpm'] = list()
     openetran['meter'] = list()
     openetran['label'] = list()
+    openetran['resistor'] = list()
 
     # Only read steepfront, arrester etc. when we're in extended view
     if guiNormal.isChecked() == True:
         openetran['steepfront'] = list()
         openetran['arrester'] = list()
         openetran['insulator'] = list()
-        openetran['resistor'] = list()
         openetran['inductor'] = list()
         openetran['capacitor'] = list()
         openetran['customer'] = list()
@@ -94,6 +94,9 @@ def read(self, guiNormal):
     # Labels
     readLabel(self, openetran)
 
+    # Resistor
+    readResistor(self, openetran)
+
     if guiNormal.isChecked() == True:
         # Steepfront
         readSteepfront(self, openetran)
@@ -103,9 +106,6 @@ def read(self, guiNormal):
 
         # Arrester
         readArrester(self, openetran)
-
-        # Resistor
-        readResistor(self, openetran)
 
         # Capacitor
         readCapacitor(self, openetran)
@@ -123,8 +123,14 @@ def read(self, guiNormal):
 
 def readSimulation(self, openetran):
     layout = self.Simulation.layout()
+    critMode = layout.itemAtPosition(2,3).widget()
 
-    for k in range(7):
+    if critMode.isChecked() == True:
+        max = 10
+    else:
+        max = 7
+
+    for k in range(max):
         widget = layout.itemAtPosition(k, 1).widget()
         openetran['simulation'].append(widget.text())
 

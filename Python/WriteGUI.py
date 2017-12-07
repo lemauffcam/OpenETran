@@ -6,7 +6,7 @@ Script to write in every GUI text fields when loading a project
 Very similar to the ReadStruct.py script, with a few added functionnalities, such
 as adding widgets dynamically if there are more than 1 element per tab.
 
-@author: Matthieu
+@author: Matthieu Bertin
 """
 
 import Add_Delete_Widgets
@@ -84,6 +84,9 @@ def write(self, openetran, dispNormal):
     # Labels
     writeLabel(self, openetran)
 
+    # Resistor
+    writeResistor(self, openetran)
+
     if dispNormal == True:
         # Steepfront
         writeSteepfront(self, openetran)
@@ -93,9 +96,6 @@ def write(self, openetran, dispNormal):
 
         # Arrester
         writeArrester(self, openetran)
-
-        # Resistor
-        writeResistor(self, openetran)
 
         # Capacitor
         writeCapacitor(self, openetran)
@@ -111,8 +111,17 @@ def write(self, openetran, dispNormal):
 
 def writeSimulation(self, openetran):
     layout = self.Simulation.layout()
+    critMode = layout.itemAtPosition(2,3).widget()
+    plotMode = layout.itemAtPosition(1,3).widget()
 
-    for k in range(7):
+    if len(openetran['simulation']) == 10:
+        max = 10
+        critMode.setChecked(True)
+    else:
+        max = 7
+        plotMode.setChecked(True)
+
+    for k in range(max):
         widget = layout.itemAtPosition(k, 1).widget()
         widget.setText(openetran['simulation'][k])
 

@@ -9,7 +9,7 @@ Draws the system
 from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QLineEdit, QFileDialog
 from PyQt5.QtGui import QPen, QPainter, QPolygonF, QPainterPath, QColor
 from PyQt5.QtCore import pyqtSlot, Qt, QLineF, QPointF
-import math
+import math, json, os.path as osp
 
 # Reads the conductors' real coordinates
 def readCoordinates(self):
@@ -450,6 +450,10 @@ def flashRate(self):
 
                     expo.append(width)
 
+                # If there aren't any exposed intersections, either the arc is completely below
+                # a ground/object line, in this case its exposure width is 0 since it's fully
+                # protected, or it's above and clear of all other arcs. In this case the exposure
+                # width is the arc's diameter
                 else:
                    if coord[1][k] < rg + obj[1][0] or coord[1][k] < rg + obj[1][1]:
                        expo.append(0)
@@ -499,6 +503,8 @@ class SysView(QWidget):
         paramLayout.addWidget(QPushButton('Update view'), 0, 0)
         paramLayout.addWidget(QPushButton('Flashover Rate'), 0, 1)
         paramLayout.addWidget(QPushButton('Update coordinates'), 0, 2)
+        paramLayout.addWidget(QPushButton('Save'), 0, 3)
+        paramLayout.addWidget(QPushButton('Load'), 0, 4)
 
         paramLayout.addWidget(QLabel('Current [kA]'), 1, 0)
         paramLayout.addWidget(QLineEdit('15'), 1, 1)
@@ -612,6 +618,80 @@ class SysView(QWidget):
 
         coordinates = paramLayout.itemAtPosition(0,2).widget()
         coordinates.pressed.connect(updateCoordinates)
+
+        @pyqtSlot()
+        def save():
+            struct = dict() # main dictionnary
+            struct['slope'] = paramLayout.itemAtPosition(2,1).widget().text()
+            struct['length'] = paramLayout.itemAtPosition(13,1).widget().text()
+            struct['density'] = paramLayout.itemAtPosition(14,1).widget().text()
+
+            struct['obj_coordinates'] = list()
+            struct['obj_coordinates'].append(list()) # Obj 1 coordinates
+            struct['obj_coordinates'].append(list()) # Obj 2 coordinates
+
+            obj1X = paramLayout.itemAtPosition(10,1).widget().text()
+            obj1Y = paramLayout.itemAtPosition(10,2).widget().text()
+
+            obj2X = paramLayout.itemAtPosition(11,1).widget().text()
+            obj2Y = paramLayout.itemAtPosition(11,2).widget().text()
+
+            struct['obj_coordinates'][0].append(obj1X)
+            struct['obj_coordinates'][0].append(obj1Y)
+
+            struct['obj_coordinates'][1].append(obj2X)
+            struct['obj_coordinates'][1].append(obj2Y)
+
+            fileDialog = QFileDialog()
+
+            if self.openEtran.lastDirectory == '':
+                filename = fileDialog.getSaveFileName(None, 'Save File', '/home', 'JSON Files (*.json)')
+            else:
+                filename = fileDialog.getSaveFileName(None, 'Save File', self.openEtran.lastDirectory, 'JSON Files (*.json)')
+
+            if filename == ("",""):
+                print('Save cancelled')
+                return
+            else:
+                with open(filename[0], 'w') as f:
+                    json.dump(struct, f, indent=2)
+
+            self.openEtran.lastDirectory = osp.dirname(filename[0])
+            print('Save done')
+
+        saveButton = paramLayout.itemAtPosition(0,3).widget()
+        saveButton.pressed.connect(save)
+
+        @pyqtSlot()
+        def load():
+            fileDialog = QFileDialog()
+
+            if self.openEtran.lastDirectory == '':
+                filename = fileDialog.getOpenFileName(None, 'Save File', '/home', 'JSON Files (*.json)')
+            else:
+                filename = fileDialog.getOpenFileName(None, 'Save File', self.openEtran.lastDirectory, 'JSON Files (*.json)')
+
+            if filename == ("",""):
+                print('Load cancelled')
+                return
+
+            else:
+                with open(filename[0], 'r') as f:
+                    struct = json.load(f)
+
+            paramLayout.itemAtPosition(2,1).widget().setText(struct['slope'])
+            paramLayout.itemAtPosition(13,1).widget().setText(struct['length'])
+            paramLayout.itemAtPosition(14,1).widget().setText(struct['density'])
+            paramLayout.itemAtPosition(10,1).widget().setText(struct['obj_coordinates'][0][0])
+            paramLayout.itemAtPosition(10,2).widget().setText(struct['obj_coordinates'][0][1])
+            paramLayout.itemAtPosition(11,1).widget().setText(struct['obj_coordinates'][1][0])
+            paramLayout.itemAtPosition(11,2).widget().setText(struct['obj_coordinates'][1][1])
+
+            self.openEtran.lastDirectory = osp.dirname(filename[0])
+            print('Load done')
+
+        loadButton = paramLayout.itemAtPosition(0,4).widget()
+        loadButton.pressed.connect(load)
 
     def paintEvent(self, e):
         qp = QPainter()

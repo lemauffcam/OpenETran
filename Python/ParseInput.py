@@ -67,8 +67,14 @@ def write(openetran):
     with open(inputFileName, 'w') as f:
 
         # We write the mandatory simulation parameters and conductor data first
+        k = 0
         for v in openetran['simulation']:
-            f.write(v + ' ')
+            if k == 7: # If we're still in the loop at that value, then it's a critical current
+                       # simulation. The last 3 parameters aren't in the .dat file.
+                break
+            else:
+                f.write(v + ' ')
+                k += 1
 
         f.write('\n')
 
