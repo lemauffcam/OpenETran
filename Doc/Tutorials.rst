@@ -1,62 +1,8 @@
-**OpenETran**
-
-**An Open-Source Electromagnetic Transient Program**
-
-During the period from 1990 through 2002, EPRI funded the development of
-a Lightning Protection Design Workstation (LPDW), which was used by many
-utilities to assess the lightning performance of distribution lines.
-Since about 2002, this program has not been available. EPRI decided to
-release the simulation kernel of LPDW under the name OpenETran, with an
-open-source license (GPL v3), so it may be incorporated into IEEE Flash
-and other projects.
-
-OpenETran can presently simulate multi-conductor power lines,
-insulators, surge arresters, non-linear grounds, and lightning strokes.
-It efficiently calculates energy and charge duty on surge arresters, and
-iterates to find the critical lightning current causing flashover on one
-or more phases. It is also suitable for use in substation insulation
-coordination. Capacitor switching, TRV, and other applications may be
-added.
-
-EPRI originally had permission to use code from the Numerical Recipes
-book in LPDW. These routines have been removed in favor of the GNU
-Scientific Library (GSL), which also uses the GPL v3 license. As a
-result, the OpenETran package can be freely used and modified, but not
-commercialized.
-
-This document presents tutorials for using OpenETran’s new graphical
-user interface (GUI), which was funded by members of CEATI’s Grounding
-and Lightning Interest Group (GLIG).
-
-Copyright and License 
-======================
-
-*Copyright (c) 1992, 1994, 1998, 2002, 2011, 2012, *
-
-*Electric Power Research Institute, Inc. *
-
-*All rights reserved.*
-
-*This file is part of OpenETran. *
-
-*OpenETran is free software: you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation, either version 3 of the License, or (at your
-option) any later version. *
-
-*OpenETran is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details. *
-
-*You should have received a copy of the GNU General Public License along
-with OpenETran. If not, see <http://www.gnu.org/licenses/>.*
-
-*
-*
+Tutorials
+=========
 
 Reviewer Notes
-==============
+--------------
 
 In this pre-release phase, GLIG reviewers should please add comments and
 changes to those already listed below.
@@ -100,7 +46,7 @@ changes to those already listed below.
     change units from “V” to “pu”.
 
 500-kV Horizontal Line
-======================
+----------------------
 
 This example is based on pp. 27-32 in Annex B of [1]. When you start the
 GUI, two windows appear. One is the main component panel called
@@ -230,7 +176,7 @@ Save your data again, as it may be used in the next section of this
 tutorial.
 
 500-kV Line Arresters
-=====================
+---------------------
 
 Line arresters have been used for transmission line protection more
 often in recent years. If actual vendor data is not available, the
@@ -319,7 +265,7 @@ very well. Flashover calculation hangs.
 |image26|
 
 15-kV Distribution Line: CFO Added
-==================================
+----------------------------------
 
 This example is based on the 15-kV distribution line described on pp.
 36-37 of [2]. Without line arresters or shield wires, nearly every
@@ -417,7 +363,7 @@ following:
    implementing lower ground impedances and/or line arresters.
 
 15-kV Distribution Line: Open Point Protection
-==============================================
+----------------------------------------------
 
 This example modifies the previous one, to consider the protection of an
 open tie point on the distribution line. We’re going to look at pole
@@ -473,8 +419,8 @@ but time-dependent and non-linear phenomena can have an impact.
 
 |image48| |image49|
 
-References
-==========
+Tutorial References
+-------------------
 
 1. IEEE Std. 1243-1997, IEEE Guide for Improving the Lightning
    Performance of Transmission Lines.
