@@ -9,7 +9,7 @@ as adding widgets dynamically if there are more than 1 element per tab.
 @author: Matthieu Bertin
 """
 
-import Add_Delete_Widgets
+from openetran_py3 import Add_Delete_Widgets
 
 # General function to write values in the text fields on the grid layout
 # Particular case if the number of text fields to read is not even

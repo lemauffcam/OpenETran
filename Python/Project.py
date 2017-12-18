@@ -11,7 +11,7 @@ import json, subprocess
 import os.path as osp
 import platform
 from PyQt5.QtWidgets import QFileDialog
-import WriteGUI, ParseInput, CSVRead, Plot2D
+from openetran_py3 import WriteGUI, ParseInput, CSVRead, Plot2D
 
 # Writes main structure into .JSON file
 def saveProject(self, openetran, lastDirectory):

@@ -9,7 +9,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QTabWidget, QWidget, QGridLayout,
                              QPushButton, QLineEdit, QLabel, QComboBox, QRadioButton)
 from PyQt5.QtCore import pyqtSlot
-import Project, ReadStruct, Add_Delete_Widgets, R60, Draw
+from openetran_py3 import Project, ReadStruct, Add_Delete_Widgets, R60, Draw
 
 # Function to add widgets on the tabs for the 1st time
 def addWidgets(grid, names, rowEnd, ColEnd):
