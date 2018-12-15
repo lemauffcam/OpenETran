@@ -29,17 +29,10 @@ SRC = \
 
 OBJ=$(SRC:.c=.o)
 
-ifndef windir
 RM=rm
 EXE=OpenETran
 CFLAGS=-Wall -O3
 LDFLAGS=-lgsl -lgslcblas -lm
-else
-RM=del
-EXE=OpenETran.exe
-CFLAGS=-Wall -O3 -I/gsl/gsl-2.1
-LDFLAGS=-L/gsl/gsl-2.1/.libs -L/gsl/gsl-2.1/cblas/.libs -static -lgsl -lgslcblas -lm
-endif
 
 CC=gcc
 
