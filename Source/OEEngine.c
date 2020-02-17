@@ -37,7 +37,6 @@ Called from the driver and xfmr modules. */
 #include "OERead.h"
 #include "OEEngine.h"
 #include "ChangeTimeStep.h"
-#include "Components/Meter.h"
 #include "WritePlotFile.h"
 #include "AllComponents.h"
 
