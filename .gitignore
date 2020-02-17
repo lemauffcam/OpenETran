@@ -1,13 +1,8 @@
-
-*.o
-
 *.csv
 
-*.out
 
-Source/OpenETran
 
-Source/openetran.log
+
 
 gsl.vtg
 
@@ -20,3 +15,7 @@ OpenETran.vpwhistu
 OpenETran.vtg
 
 Python/__pycache__/
+
+# Windows temporary files
+~*
+

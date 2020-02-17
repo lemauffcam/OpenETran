@@ -1,0 +1,19 @@
+# Compiled files
+*.o
+*.out
+Win32/**
+x64/**
+
+# Files created by tests
+openetran.log
+
+# Visual Studio files
+*.sln
+*.vcxproj*
+ELT
+CppProperties.json
+.vs
+
+
+# Dependencies
+packages*
