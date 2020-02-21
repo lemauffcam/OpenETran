@@ -54,9 +54,10 @@ char *first_token ()
 	t = NULL;
 	ts = strtok (ps, "\n\r");  /* now ts points to a NULL-terminated input line */
 	if (ts) {
-		while (*ts != '\0' && isspace (*ts)) {
-			++ts;
-		}
+		// Dangerous if the line starts with several spaces
+		//while (*ts != '\0' && isspace (*ts)) {
+		//	++ts; /* move pointer from one position while the pointing character is a white space */
+		//} /* now ts starts with a useful character */
 		
 		/* update ps to point to the first useful character of the next line
 		asuming that the end of line needs the 2 characters \r\n for CR/LF */
