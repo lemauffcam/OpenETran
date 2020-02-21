@@ -1,5 +1,5 @@
 # Compiling for Windows 10 and above
-You should install [Visual Studio Community 2019](https://visualstudio.microsoft.com/).
+You should first install [Visual Studio](https://visualstudio.microsoft.com/). The following process has been adapted for Visual Studio  Community 2019.
 
 
 ## Installing dependencies: GNU Scientific Librairy
@@ -36,23 +36,24 @@ After loading the project in Visual Studio (see next section), you will have to 
 .\vcpkg export gsl:x64-windows gsl:x86-windows --nuget --nuget-id=openetrandeps --nuget-version=1.0.0
 ```
 
-Then in Visual Studio, go to "Tool/NuGet Package Manager/Package Manager Console". Paste the last line of the PowerShell in the new console window in Visual Studio.
+Then in Visual Studio, go to *Tool/NuGet Package Manager/Package Manager Console*. Paste the last line of the PowerShell in the new console window in Visual Studio.
 ```
 Install-Package openetrandeps -Source "C:\DEV\vcpkg"
 ```
 
 ## Compiling with Visual Studio
-Launch Visual Studio and then open a new project: "File/New/Project From Existing Code..."
+Launch Visual Studio and then open a new project: *File/New/Project From Existing Code...*
 
 Import the GSL NuGet package if vcpkg is not installed with admin rights (see previous section).
 
-Open the Project Property Pages under "Project/Properties", select the configuration [Debug|Release] and the platform [Win32|x64].
+Open the Project Property Pages under *Project/Properties*, select the configuration [Debug|Release] and the platform [Win32|x64].
 
-To compile, launch "Build/Build solution"
+To compile, launch *Build/Build solution*
 
 ### Adding a hook for post-compiling tests
-Open the Project Property Pages under "Project/Properties", under Configuration Properties/Debuging, modify the options "Command", "Command Arguments" and "Working Directory".
+Open the Project Property Pages under *Project/Properties*, under Configuration Properties/Debuging, modify the options "Command", "Command Arguments" and "Working Directory".
+
 Example:
-Command           = $(TargetPath)
-Command Arguments = -plot none $(SolutionDir)\Tests\test.dat
-Working Directory = $(ProjectDir)
+- Command           = $(TargetPath)
+- Command Arguments = -plot none $(SolutionDir)\Tests\test.dat
+- Working Directory = $(ProjectDir)
