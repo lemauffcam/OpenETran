@@ -64,8 +64,8 @@ void oe_exit (int i);
 
 extern FILE *logfp;
 
-#define ONE_SHOT		0  /* ltengine iteration modes */
-#define FIND_CRITICAL_CURRENT	1
+#define ONE_SHOT		      0  /* Simulation mode: One Shot Mode with Plot Files */
+#define FIND_CRITICAL_CURRENT 1  /* Simulation mode: Critical Current Iteraction Mode */
 
 #define INVALID_PHASE -1
 #define MAX_CIRCUITS 3
@@ -109,30 +109,34 @@ enum plot_type {
 	PLT_ELT,
 	PLT_MAT }; // MatLab not implemented yet
 
+/* Type of a structure containing the simulation options and pointers to the files */
 typedef struct tagLTINSTRUCT {
 	double ic;  /* critical current to cause flashover */
-	FILE *fp;   /* input file */
-	FILE *op;   /* text output file, for DOS only */
-	FILE *bp;   /* plot output file */
+	FILE *fp;   /* pointer to input file */
+	FILE *op;   /* pointer to text output file, for DOS only */
+	FILE *bp;   /* pointer to plot output file */
 	int plot_type;
 	int stop_on_flashover;
-	int iteration_mode;  /* none, critical current, transformer case */
+	int iteration_mode;  /* simulation mode [ONE_SHOT|FIND_CRITICAL_CURRENT] */
 	int first_pole_hit;  /* indicates which poles and wires to find critical current for */
 	int last_pole_hit;
 	int wire_struck [MAX_WIRES_HIT];  /* >0 if wire is exposed to direct stroke */
 } LTINSTRUCT;
 
+/* Type of a pointer to a structure containing the simulation options and pointers to the files */
 typedef LTINSTRUCT *LPLTINSTRUCT;
 
+/* Type of a structure LTOUTSTRUCT containing the command line ouput values */
 typedef struct tagLTOUTSTRUCT {
-	double SI;      /* highest insulator severity index */
-	double energy;  /* highest arrester discharge energy */
-	double current;  /* highest arrester discharge current */
-	double charge;   /* highest arrester charge */
+	double SI;            /* highest insulator severity index */
+	double energy;        /* highest arrester discharge energy */
+	double current;       /* highest arrester discharge current */
+	double charge;        /* highest arrester charge */
 	double predischarge;  /* highest predischarge current */
 	double icritical [MAX_WIRES_HIT]; /* critical current for direct stroke to each wire */
 } LTOUTSTRUCT;
 
+/* Type of a pointer to a structure LTOUTSTRUCT containing the command line ouput values */
 typedef LTOUTSTRUCT *LPLTOUTSTRUCT;
 
 extern long nr_iter;
@@ -159,9 +163,12 @@ extern int solution_valid; /* flag for solving arresters at each time step */
 extern int left_end_z; /* TRUE if left end of circuit has surge impedance terminations */
 extern int right_end_z;
 
+extern double SI;            /* maximum insulator severity index of all components in the simulation for output on the command line */
+extern double energy;        /* maximum arrester energy of all components in the simulation for output on the command line */
+extern double current;       /* maximum current of all components in the simulation for output on the command line */
+extern double charge;        /* maximum charge of all components in the simulation for output on the command line */
 extern double predischarge;  /* maximum predischarge current in pipegaps */
-extern double SI, energy, current, charge; /* maximum insulator severity index, and
-	maximum arrester energy, current, and charge, of all components in the simulation */
+
 extern int flash_halt, flash_halt_enabled; /* flags to stop simulation if an insulator flashes over */
 extern int want_si_calculation;  /* set 1 for solution by bisection, 0 for an estimate */
 extern int gi_iteration_mode;

@@ -21,7 +21,7 @@
 #ifndef oeread_included
 #define oeread_included
 
-int readfile (void);
+int readfile (void); /* this function supervises reading from either a file or buffer */
 
 void reset_system (void); /* reset past history terms for critical current iterations - ltaux.c */
 int cleanup (void); /* free memory in the linked lists - ltaux.c */

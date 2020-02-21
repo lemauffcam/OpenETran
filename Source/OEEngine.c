@@ -59,7 +59,7 @@ Called from the driver and xfmr modules. */
 /* definitions for externs in ltengine.h */
 
 char *sp;
-char *sn;
+char *sn; /* string containing the input file text */
 
 int header_stop[3] = {0, 0, 0};
 
@@ -81,45 +81,60 @@ int right_end_z;
 gsl_vector_int *poles_used;
 gsl_matrix_int *pairs_used;
 
-double predischarge;  /* maximum predischarge current in pipegaps */
-double SI, energy, current, charge; /* maximum insulator severity index, and
-	maximum arrester energy, current, and charge, of all components in the simulation */
-int flash_halt, flash_halt_enabled; /* flags to stop simulation if an insulator flashes over */
+double SI;            /* maximum insulator severity index of all components in the simulation for output on the command line */
+double energy;        /* maximum arrester energy of all components in the simulation for output on the command line */
+double current;       /* maximum current of all components in the simulation for output on the command line */
+double charge;        /* maximum charge of all components in the simulation for output on the command line */
+double predischarge;  /* maximum predischarge current in pipegaps for output on the command line */
+
+int flash_halt;
+int flash_halt_enabled; /* flags to stop simulation if an insulator flashes over */
 int want_si_calculation;  /* set 1 for solution by bisection, 0 for an estimate */
 
 int gi_iteration_mode;
 
-/* main simulation function */
 
-int lt (LPLTINSTRUCT lt_input, LPLTOUTSTRUCT answers)
+/* main simulation function */
+int lt (LPLTINSTRUCT lt_input, /* pointer to the structure LTINSTRUCT containing the simulation options and pointers to the files */
+		LPLTOUTSTRUCT answers) /* pointer to the structure LTOUTSTRUCT containing the command line ouput values */
 {
 	unsigned int bytes = 0;
 	int i, j;
 	
 	gi_iteration_mode = lt_input->iteration_mode;
 
-	if (lt_input->fp) { /* input comes from a file */
-		sp = sn = (char *) malloc (BUFFER_LENGTH);
-		bytes = fread (sn, 1, BUFFER_LENGTH_LESS_1, lt_input->fp);
-		sn [bytes] = '\0';
+	/* copying input file text into string pointed by sn */
+	if (lt_input->fp) { /* checking that the input file pointer was initialized */
+		sn = (char*) malloc(BUFFER_LENGTH); /* allocating the memory pointed by sn as a string with a maximum size */
+		bytes = fread (sn, 1, BUFFER_LENGTH_LESS_1, lt_input->fp); /* copying the input file to the string sn */
+		sn [bytes] = '\0'; /* adding a null terminator at the end of the input string */
 	} else {
 		if (logfp) fprintf( logfp, "No input available for lt simulation\n");
 		oe_exit (ERR_BUFFER_MISSING);
 	}
-	op = lt_input->op; /* text output */
-	bp = lt_input->bp; /* plot file */
+
+	sp = (char*)malloc(BUFFER_LENGTH); /* allocating the memory pointed by sp as a string with a maximum size
+									   future usage not found except from freeing memory */
+
+	op = lt_input->op; /* pointer to output file */
+	bp = lt_input->bp; /* pointer to plot file */
+
+	/* initializing flag to stop simulation if an insulator flashes over */
 	if (lt_input->stop_on_flashover) {
 		flash_halt_enabled = TRUE;
 	} else {
 		flash_halt_enabled = FALSE;
 	}
+
+	/* initializing flag to calculate insulator sevrity index */
 	if (gi_iteration_mode == ONE_SHOT) {
 		want_si_calculation = TRUE;
 	} else {
 		want_si_calculation = TRUE; /* need SI when iterating for critical current */
 	}
-/* set up head pointers for the linked lists */
-	(void) init_surge_list ();
+
+	/* set up head pointers for the linked lists */
+	(void) init_surge_list ();      /* initialization for keyword SURGE (surge current with 1-cosine waveshape front) */
 	(void) init_source_list ();
 	(void) init_meter_list ();
 	(void) init_pole_list ();
@@ -136,8 +151,11 @@ int lt (LPLTINSTRUCT lt_input, LPLTOUTSTRUCT answers)
 	(void) init_lpm_list ();
 	(void) init_arrbez_list ();
 	(void) init_steepfront_list ();
-/* read input from either the file or the memory buffer */
+
+	/* read input from either the file or the memory buffer */
 	(void) readfile ();
+
+	/* printing the head/begining of the output file */
 	if (op && (gi_iteration_mode == ONE_SHOT)) { /* DOS only */
 		fprintf (op, "  N   span     dT   Tmax\n");
 		fprintf (op, "%3d %6.2f %.4g %.4g\n", 
@@ -164,8 +182,9 @@ int lt (LPLTINSTRUCT lt_input, LPLTOUTSTRUCT answers)
 			fprintf (op, "\n");
 		}
 	}
-/* complete set-up of the system model, with past history currents for
-storage elements */
+
+	/* complete set-up of the system model, with past history currents for
+	storage elements */
 	if (!using_network) {
 		connect_lines ();
 	}

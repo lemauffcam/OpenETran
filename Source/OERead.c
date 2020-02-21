@@ -39,7 +39,7 @@ simulation in oeengine.c */
 #include "ReadUtils.h"
 #include "AllComponents.h"
 
-#define DEFAULT_LABEL_SIZE  10
+#define DEFAULT_LABEL_SIZE  10 /* only used to allocate the string size when no label is given for a node */
 
 char **pole_labels; /* 0..number_of_poles labels for SuperTran graphs */
 char **phase_labels; /* 0..number_of_phases labels for SuperTran graphs */
@@ -49,23 +49,30 @@ char phase_label_token[] = "labelphase";
 /*  &&&&   functions to read input file */
 
 /* this function supervises reading from either a file or buffer */
-
 int readfile (void)
 {
 	char *p;
 	int i;
 
-/* init_parser may be found in parser.c   In the DOS version, we read the
-whole input file into a char buffer.  In LPDW, this char buffer was set
-up and passed in from driver or xfmr.  Either way, we get input data
-by parsing a char buffer in memory. */
+	/* init_parser may be found in parser.c   In the DOS version, we read the
+	whole input file into a char buffer.  In LPDW, this char buffer was set
+	up and passed in from driver or xfmr.  Either way, we get input data
+	by parsing a char buffer in memory. */
 	init_parser (sn);
-	number_of_poles = number_of_conductors = number_of_nodes = 0;
-	first_dT = second_dT = dT_switch_time = 0.0;
-	using_second_dT = dT_switched = FALSE;
+
+	/* initializing variables to 0 values regarding their types */
+	number_of_poles = 0;
+	number_of_conductors = 0;
+	number_of_nodes = 0;
+	first_dT = 0.0;
+	second_dT = 0.0;
+	dT_switch_time = 0.0;
+	using_second_dT = FALSE;
+	dT_switched = FALSE;
 	using_multiple_span_defns = FALSE;
-/* read the first "line" of input - simulation control parameters */
-	p = first_token ();
+
+	/* read the first "line" of input - simulation control parameters */
+	p = first_token (); /* pointer to a string containing the first word of the string initialized in init_parser(sn) */
 	if (!p) {
 		if (logfp) fprintf( logfp, "elt error trying to read number of phases\n");
 		oe_exit (ERR_PHASE_READ);
@@ -95,7 +102,8 @@ by parsing a char buffer in memory. */
 			oe_exit (ERR_NPOLES);
 		}
 		(void) next_double (&dT_switch_time);
-	} else {
+	} else { /* read classical first line:
+			 Ncond Npole Span, left_termination right_termination dT Tmax */
 		using_network = FALSE;
 		number_of_nodes = atoi (p);
 		(void) next_int (&number_of_poles);
@@ -114,17 +122,20 @@ by parsing a char buffer in memory. */
 			oe_exit (ERR_NPOLES);
 		}
 	}
+
 	first_dT = dT;  /* so we can reset dT under loop control */
-/* set up arrays needed for branch connections */
+	
+	/* set up arrays needed for branch connections */
 	if (number_of_nodes > 0) {
 		pairs_used = gsl_matrix_int_calloc (number_of_nodes, number_of_nodes);
 	} else {
 		if (logfp) fprintf( logfp, "bad number of nodes: %d\n", number_of_nodes);
 		oe_exit (ERR_NPHASES);
 	}
-/* the conductor data must follow the first line */
+
+	/* the conductor data must follow the first line */
 	number_of_conductors = number_of_nodes; /* unless fewer specified on conductor cards */
-	if (using_network) {
+	if (using_network) { /* network system input */
 		read_spans ();
 		read_lines (); /* also determines number_of_poles */
 		if (number_of_poles > 0) {
@@ -133,12 +144,12 @@ by parsing a char buffer in memory. */
 			if (logfp) fprintf( logfp, "bad number of poles: %d\n", number_of_poles);
 			oe_exit (ERR_NPOLES);
 		}
-	} else {
-		read_conductors (span_ptr);
+	} else { /* classical input with only one kind of span */
+		read_conductors (span_ptr); /* span_ptr is initialized by init_span_list(void) */
 	}
 	reset_lines ();
 
-/* set up default pole and phase labels */
+	/* set up default pole and phase labels */
 	pole_labels = (char **) malloc ((size_t) (number_of_poles + 1) * sizeof (char *));
 	for (i = 0; i <= number_of_poles; i++) {
 		pole_labels[i] = (char *) malloc (DEFAULT_LABEL_SIZE * sizeof (char));
@@ -150,10 +161,10 @@ by parsing a char buffer in memory. */
 		sprintf (phase_labels[i], "%d", i);
 	}
 
-/* after reading the conductor data, go through the rest of the input
-looking for string tokens that identify various model components.  As
-each token is identified, dispatch to the appropriate reading function.
-We stop when there are no more tokens in the buffer */
+	/* after reading the conductor data, go through the rest of the input
+	looking for string tokens that identify various model components.  As
+	each token is identified, dispatch to the appropriate reading function.
+	We stop when there are no more tokens in the buffer */
 	while ((p = first_token ()) != NULL) {
 		if (!strcmp (p, ground_token)) {
 			(void) read_ground ();

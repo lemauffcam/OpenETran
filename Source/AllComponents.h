@@ -35,9 +35,8 @@
 #include "Components/PipeGap.h"
 #include "Components/Pole.h"
 #include "Components/Resistor.h"
-#include "Components/Source.h"
-#include "Components/SteepFront.h"
-#include "Components/Surge.h"
+#include "Components/SteepFront.h" /* surge current with a steep front and an exponential tail */
+#include "Components/Surge.h"      /* surge current with 1-cosine waveshape front */
 
 #include "Components/NewArr.h"
 #include "Components/Transformer.h"

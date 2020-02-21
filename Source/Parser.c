@@ -26,8 +26,8 @@ buffer in memory */
 #include <ctype.h>
 #include "Parser.h"
 
-static char seps[] = " \t\n\v\f\r\a\b";  /* for the library function strtok */
-static char eat_line_seps[] = "\n\r";  /* for the library function strtok */
+static char seps[] = " \t\n\v\f\r\a\b";  /* word delimiters for the library function strtok */
+static char eat_line_seps[] = "\n\r";  /* line delimiters for the library function strtok */
 
 static char *t;  /* points to a retrieved token */
 static char *ps;  /* points to current char location in the buffer sn */
@@ -35,36 +35,40 @@ static char ns [64];  /* maximum size of a single token */
 
 /*  &&&&  input file parsing functions  */
 
+/* update the pointer ps to the position of the first usefull character in the string sn */
 void init_parser (char *sn)
 {
-	ps = sn;
+	ps = sn; /* initializing ps to the pointer of the first character of the string pointed by sn */
 	while (*ps != '\0' && isspace (*ps)) {
-		++ps;
+		++ps; /* move pointer from one position while the pointing character is a white space */
 	}
 }
 
 /* form a "line" of input starting at the current buffer position, and
 stopping at a CR/LF.  Then return the first token from this "line". */
-	
 char *first_token ()
 {
 	int i, imax;
 	char *ts;
 
 	t = NULL;
-	ts = strtok (ps, "\n\r");  /* now ts is a NULL-terminated input line */
+	ts = strtok (ps, "\n\r");  /* now ts points to a NULL-terminated input line */
 	if (ts) {
 		while (*ts != '\0' && isspace (*ts)) {
 			++ts;
 		}
-		imax = strlen (ts);
-		ps += (imax + 1);      /* get ready for the next input line */
+		
+		/* update ps to point to the first useful character of the next line
+		asuming that the end of line needs the 2 characters \r\n for CR/LF */
+		imax = strlen (ts); /* length of the first word of the line */
+		ps += (imax + 1);   /* move the next input line */
 		while (*ps != '\0' && isspace (*ps)) {
-			++ps;
+			++ps; /* move pointer from one position while the pointing character is a white space */
 		}
-		t = strtok (ts, seps); /* initialize library function strtok */
+
+		t = strtok (ts, seps); /* now t points to a string equal to the first word of the line */
 		if (t) {
-			if (t[0] == '*') { /* comment line - try again */
+			if (t[0] == '*') { /* comment line - try again with next line */
 				return first_token ();
 			}
 			imax = strlen (t);
